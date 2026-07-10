@@ -67,7 +67,7 @@ concentration of column-major/1-based index risk and shares validation disciplin
 square-grid analysis is wanted. No infra, **but** confirm the ported SAC supports cross-correlation
 mode (needed by `xSacProps`).
 
-**v0.6 — NEW INFRA: EEG/EGF loading (v0.6a DONE) → then LFP/theta analysis (v0.6b pending).**
+**v0.6 — NEW INFRA: EEG/EGF loading (v0.6a DONE) → then LFP/theta analysis (v0.6b PARTIAL: power_spectrum DONE; eeg_instant_freq_power/detect_ripples deferred).**
 *v0.6a (infra):* add `.eeg` (int8, 250 Hz) and `.egf` (int16, 4.8 kHz) reading to the DACQ loader, an
 `lfp` field on Recording, and `eeg_convert_to_volts`. *v0.6b (analysis, after 6a):*
 `eeg_instant_freq_power`, `eeg_power_spectra`, `detect_ripples` (ripples require `.egf`). This is the

@@ -20,6 +20,7 @@ from .direction import (
 )
 from .grid import grid_properties, grid_score, gridness, spatial_autocorrelogram
 from .grid_ellipse import fit_grid_ellipse, regularise_elliptic_sac
+from .lfp import power_spectrum
 from .maps import occupancy_map, rate_map, smooth_ratemap, spike_map
 from .phase_precession import circular_linear_regression
 from .place_fields import field_stats, spatial_coherence, spatial_correlation
@@ -60,4 +61,5 @@ __all__ = [
     "circular_linear_regression",
     "fit_grid_ellipse",
     "regularise_elliptic_sac",
+    "power_spectrum",
 ]

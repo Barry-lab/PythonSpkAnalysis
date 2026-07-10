@@ -60,7 +60,8 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `getegf.m` (raw read only, no decimation — see `FINDINGS.md`) | `io.axona._read_egf` | internal — 4.8kHz .egf reader |
 | `eeg_convert_to_volts.m` | `io.axona.eeg_convert_to_volts(samples, channel, settings, kind)` | public — counts to volts |
 | (LFP loading) | `load_dacq(..., load_lfp=True)` -> `Recording.lfp` | public — unlocks theta/LFP analysis |
-| `Analysis_Freq` theta/power/ripple analysis | — | **not yet ported** (`PORTING_PLAN.md` v0.6b) |
+| `eeg_power_spectra.m` | `power_spectrum(eeg, pos2use, ...)` | public — FFT power spectrum, theta peak/s2n |
+| `eeg_instant_freq_power.m`, `detect_ripples.m` | — | **not yet ported** (`PORTING_PLAN.md` v0.6b, deferred) |
 | 2-D FFT grid analysis, cross-SAC, field shuffle | — | **not yet ported** (`PORTING_PLAN.md` v0.5/v0.7) |
 
 Everything marked *internal* runs inside `load_dacq`; you do not call it directly,

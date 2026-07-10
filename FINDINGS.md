@@ -355,7 +355,30 @@ sanity check that the byte layout and endianness are being read correctly
 (a parsing error would far more likely produce noise or an implausible peak
 than a textbook theta frequency).
 
-## 10. Things confirmed correct and bit-exact
+## 10. LFP power spectrum, v0.6b
+
+Ported `eeg_power_spectra.m` -> `power_spectrum()` (`analysis/lfp.py`): an
+FFT-based power spectrum with Gaussian smoothing, theta-band peak detection,
+and signal-to-noise, optionally restricted to specific position samples (e.g.
+only fast-running periods). Derived the `pos2use`-to-EEG-sample index mapping
+fresh in 0-based terms rather than transcribing MATLAB's 1-based offset
+formula, to avoid an off-by-one.
+
+**`eeg_instant_freq_power.m` (bandpass + Hilbert instantaneous phase/frequency)
+and `detect_ripples.m` deferred, not ported.** Both are more involved
+(FIR bandpass design + `filtfilt` + Hilbert transform; ripple detection has
+several documented bugs per `PORTING_PLAN.md`) and time did not allow the
+same careful read-source/port/validate cycle used elsewhere. Still tracked.
+
+**Validation.** Synthetic sinusoid embedded in noise: recovered peak
+frequency within 0.5 Hz and a clear, high signal-to-noise ratio. On real LFP
+(r1838 ch1, the `.egf` channel loaded in v0.6a): peak at 9.14 Hz (whole
+session) / 9.38 Hz (a position-restricted subset), both cleanly in the
+6-12 Hz theta band, with signal-to-noise of 14-16x — a textbook-clean
+hippocampal theta signature for a foraging rat, and a strong end-to-end
+sanity check spanning the new LFP loader (v0.6a) through this analysis.
+
+## 11. Things confirmed correct and bit-exact
 
 `.pos`/tetrode/`.cut` binary readers (big-endian, 216-byte spikes, 20-byte pos
 records); LED swap + speed filtering; NaN interpolation; 20-tap boxcar position
