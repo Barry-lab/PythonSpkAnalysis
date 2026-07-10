@@ -1,129 +1,239 @@
 # barrylab
 
-Spatial-coding analysis for the Barry lab, in Python. A modern, validated
-successor to the [`Universal_Matlab`](https://github.com/Barry-lab/Universal_Matlab)
-toolbox that reads **historic Axona/DACQ tetrode data today** and is built to
-grow into **Neuropixels (SpikeGLX & Open Ephys)** without rewriting a single
-line of analysis code. If you are new to the lab and coming from MATLAB, this is
-where to start.
+Spatial-coding analysis for tetrode (Axona/DACQ) and, soon, Neuropixels
+recordings — rate maps, grid cells, head direction, Bayesian decoding, replay
+scoring, phase precession, and LFP/theta analysis, all built around one
+common `Recording` object so the same analysis code runs unchanged regardless
+of what acquisition system the spikes came from.
 
-> **This is an AI-assisted port of `Universal_Matlab`, not yet independently
-> checked by a human. It needs checking.** Every ported function is validated
-> numerically against MATLAB output where a reference exists (bit-exact
-> fixture, synthetic ground truth, or a textbook/analytic oracle — see
-> [Validation](#validation) and [`FINDINGS.md`](FINDINGS.md)), and any MATLAB
-> bugs/quirks found along the way are documented there rather than silently
-> "fixed" — but no lab member has yet reviewed the port line-by-line.
-> `Universal_Matlab` remains the reference implementation and should be
-> treated as ground truth until someone has been through this repo properly.
-> If you use this package for real analysis, please sanity-check your results
-> against the MATLAB toolbox and open an issue if anything looks off. This
-> section will be updated as the port progresses and gets reviewed.
->
-> **Status: in progress.** DACQ loading, spatial binning, rate maps, Skaggs
-> info, grid/gridness, head direction, place-field stats, Bayesian decoding,
-> phase precession, grid-ellipse correction, LFP loading + power spectrum, and
-> watershed field segmentation are implemented and validated (see
-> [Validation](#validation)). Neuropixels loading and several remaining
-> analyses are on the [roadmap](#roadmap); see
-> [`PORTING_PLAN.md`](PORTING_PLAN.md) for the full current status.
+This is a Python port of the Barry lab's MATLAB toolbox,
+[`Universal_Matlab`](https://github.com/Barry-lab/Universal_Matlab), done
+with an AI-assisted, source-read-and-validated process rather than by hand —
+see [Provenance & validation](#provenance--validation) below before relying
+on it for a paper. `Universal_Matlab` remains the reference implementation
+until a lab member has reviewed this port properly.
 
-## One glance
+## Install
+
+```bash
+pip install -e ".[dev,plot]"          # or: uv pip install -e ".[dev,plot]"
+```
+
+Requires Python ≥ 3.9. Everything below works out of the box for DACQ data;
+`[fieldshuffle]` (scikit-image, for the watershed-based field-shuffle test)
+and `[neuropixels]`/`[nwb]` (for the not-yet-built Neuropixels/NWB front
+ends) are separate extras so a DACQ-only install stays lightweight.
+
+## Quickstart
 
 ```python
 import barrylab as bl
 
-rec = bl.load_dacq("/data/r1838_10-12-14/83812141")   # any file of the trial
-rmap = bl.rate_map(rec, electrode=2, cluster=3)        # 2-D firing rate map (Hz)
-occ = bl.occupancy_map(rec)                            # matching dwell-time map
+rec  = bl.load_dacq("/data/r1838_10-12-14/83812141")     # any file of the trial
+rmap = bl.rate_map(rec, electrode=2, cluster=3)            # 2-D firing rate map (Hz)
+occ  = bl.occupancy_map(rec)                               # matching dwell-time map
 bits_per_spike, bits_per_s = bl.spatial_information(rmap, occ)
 ```
 
-See [`examples/quickstart.py`](examples/quickstart.py) for a runnable version
-that also plots the trajectory and rate map.
+`load_dacq` reads the whole trial (position, all tetrodes, cluster cuts,
+optionally LFP) into a single `Recording` — every analysis function below
+just takes that object (or a rate map/array derived from it) and a couple of
+parameters. See [`docs/getting_started.md`](docs/getting_started.md) for a
+walked-through tour (install → load a trial → first rate map → a figure) and
+[`examples/quickstart.py`](examples/quickstart.py) for the runnable script
+version.
 
-## The idea: one backend, many frontends
+## What's here
+
+Grouped the same way the original MATLAB toolbox is (`Analysis_Grid`,
+`Analysis_Dir`, `Decoding`, `Analysis_Freq`, ...) so it's easy to find the
+Python equivalent of a function you already know. Every snippet below is
+runnable once you have a `rec` from `load_dacq` (and `import numpy as np` for
+the couple that need it) — see [`docs/matlab_migration.md`](docs/matlab_migration.md)
+for the complete function-by-function map to the MATLAB originals.
+
+### Rate maps & spatial information
+
+The foundation everything else builds on: bin occupancy and spikes over
+space, smooth, and quantify how spatially informative a cell's firing is.
+
+```python
+rmap = bl.rate_map(rec, 2, 3, smoothing="gaussian", smooth_size=2)  # sigma in bins
+bits_per_spike, bits_per_s = bl.spatial_information(rmap, bl.occupancy_map(rec))
+```
+
+### Grid cells
+
+A spatial autocorrelogram (SAC), its gridness (how hexagonally-regular the
+firing pattern is), grid scale/orientation, elliptical-distortion correction,
+and cross-cell phase comparison for two cells from the same grid module.
+
+```python
+sac = bl.spatial_autocorrelogram(rmap)
+standard_g, expanding_g = bl.gridness(sac)          # two classic gridness measures
+props = bl.grid_properties(sac)                     # scale, orientation, peak geometry
+
+# correct for elliptical distortion before recomputing gridness
+ellipse = bl.fit_grid_ellipse(sac)                  # note: orientation is in RADIANS
+corrected_sac = bl.regularise_elliptic_sac(
+    sac, ellipse["ab_scale"], orient_deg=np.degrees(ellipse["orientation"])
+)
+
+# relative spatial phase between two cells of the same grid module
+xsac = bl.cross_correlogram(rmap_a, rmap_b)
+phase = bl.cross_sac_props(xsac)                    # phase_mag, phase_ang, ...
+```
+
+`bl.fast_gridness` is a second, faster gridness implementation (standard +
+expanding + scale in one call) used by the field-shuffle significance test
+below — it is a genuinely different algorithm from `gridness`, not just an
+optimisation, so don't expect the two to agree bit-for-bit (see its
+docstring).
+
+### Head direction
+
+Directional tuning curves, resultant vector, directionality index, and
+hexadirectional (grid-cell) modulation of firing by heading.
+
+```python
+hd_map = bl.head_direction_map(rec, 2, 3)
+stats = bl.head_direction_stats(rec, 2, 3)          # tuning curve + resultant length/direction/directionality in one dict
+directionality = bl.directionality(hd_map)          # KL-divergence-based index, on its own
+hex_mod = bl.directional_fft(hd_map)                # 6-fold (and other) modulation
+```
+
+### Place-field statistics
+
+Field size/rate/count, spatial coherence, and map-to-map correlation (for
+remapping/stability analyses).
+
+```python
+fields = bl.field_stats(rmap, min_field_bins=9, min_rate=1.0)
+coherence = bl.spatial_coherence(rmap)
+stability = bl.spatial_correlation(rmap_session1, rmap_session2)
+```
+
+### Place × direction
+
+A joint place-by-direction firing model, fit by alternating maximum
+likelihood — useful when a cell's spatial and directional tuning aren't
+independent.
+
+```python
+place_map, direction_map = bl.place_by_direction(rec, electrode=2, cluster=3)
+```
+
+### Bayesian population decoding
+
+Decode position from a population's spike counts — a naive maximum-likelihood
+Poisson decoder, a full Bayesian version with a movement prior, and a
+Recording-level convenience wrapper that builds rate maps on a training split
+and decodes a held-out test split.
+
+```python
+result = bl.crunch_decode(rec, cells=[(2, 3), (2, 1), (3, 4)], t_bin=0.25)
+print(result["err"].mean(), "cm mean decode error")
+```
+
+Lower-level pieces (`bl.bayesian_posterior`, `bl.bayesian_posterior_with_prior`,
+`bl.spike_counts_per_window`, `bl.decode_maximum_likelihood`) are all public
+too if you want to build your own pipeline.
+
+### Replay / trajectory scoring
+
+Given a decoded posterior over time (e.g. during a sharp-wave ripple), find
+the best constant-speed straight-line trajectory through it — a common way
+to score candidate replay events.
+
+```python
+best_res, best_speed, best_y_intercept, line_mask = bl.best_line(
+    posterior_matrix, t_bin_sz=0.005, s_bin_sz=2, y_range=14
+)
+```
+
+### Phase precession
+
+Circular-linear regression relating position-within-field to theta phase,
+with permutation-based significance.
+
+```python
+fit = bl.circular_linear_regression(position_in_field, theta_phase, k=1000)
+print(fit["slope_opt"], fit["corr"], fit["psim"])   # rad/unit-x, circular-circular R, permutation p-value
+```
+
+### LFP / theta
+
+Load raw LFP alongside position/spikes (`load_dacq(..., load_lfp=True)`),
+then get an FFT-based power spectrum with automatic theta-band peak
+detection.
+
+```python
+rec = bl.load_dacq(path, load_lfp=True)
+eeg = rec.lfp[1]["samples"]                          # channel 1's raw trace
+spectrum = bl.power_spectrum(eeg, eeg_freq=rec.lfp[1]["sample_rate"])
+print(spectrum["max_freq"], "Hz theta peak, s2n =", spectrum["s2n"])
+```
+
+### Grid-cell significance testing (field shuffle)
+
+Is a cell's gridness higher than chance? Segment its rate map into firing
+fields (watershed), then compare its real gridness against temporal-shuffle
+and field-shuffle null distributions. Needs the `[fieldshuffle]` extra
+(`pip install "barrylab[fieldshuffle]"`), so it lives under
+`barrylab.analysis.field_shuffle` rather than the top-level namespace:
+
+```python
+from barrylab.analysis.field_shuffle import is_grid_cell
+
+result = is_grid_cell(rec, electrode=2, cluster=3, n_shuffles=100)
+print(result["is_grid"])   # (4, 2) bool: 4 gridness variants x [temporal, field] shuffle
+```
+
+## The `Recording` object
 
 ```
 RAW FILES            FRONT-END LOADERS          COMMON OBJECT        ANALYSIS
 ------------------   ------------------------   ------------------   ------------------
 DACQ / Axona     ->  load_dacq()            \
-Neuropixels/SpikeGLX  (SpikeInterface)       >  Recording        ->  rate maps, Skaggs
-Neuropixels/OpenEphys (SpikeInterface)      /   (spikes, xy,          info, gridness,
-                                                 speed, dir, lfp)     HD tuning, decoding
+Neuropixels/SpikeGLX  (SpikeInterface, WIP)  >  Recording        ->  everything above
+Neuropixels/OpenEphys (SpikeInterface, WIP) /   (spikes, xy,
+                                                 speed, dir, lfp)
 ```
 
-A loader's only job is to fill a [`Recording`](src/barrylab/core/recording.py).
-Every analysis consumes that object and nothing else, so a rate map does not
-care whether the spikes came from a 2010 tetrode or a 2026 Neuropixel.
-
-## Install
-
-```bash
-# from a clone, with uv (recommended)
-uv pip install -e ".[dev,plot]"
-# or plain pip
-pip install -e ".[dev,plot]"
-```
-
-Requires Python >= 3.9. Neuropixels and NWB support are optional extras
-(`.[neuropixels]`, `.[nwb]`) so a DACQ-only user stays lightweight.
-
-## Layout
-
-```
-src/barrylab/
-  core/recording.py     the common Recording / Electrode objects
-  io/
-    _axona_files.py      byte-level Axona header + binary reader
-    _position.py         DACQ position post-processing (swap/speed/interp/smooth)
-    axona.py             load_dacq(): the DACQ front-end loader
-  analysis/
-    maps.py              binning + rate maps (histnd, smooth_ratemap)
-    spatial.py           Skaggs spatial information + adaptive binning
-  params.py              default parameters (from default_vars.m)
-tests/                   pytest suite (synthetic + golden-master)
-validation/              numerical validation against MATLAB, + fixture generator
-```
-
-## Validation
-
-We follow a **golden-master** philosophy: each ported function is checked
-numerically against the lab's MATLAB output, not merely for internal
-consistency. The example trial ships with a reference `.mat` so we can validate
-stage by stage.
-
-```bash
-python3 validation/validate_against_matlab.py     # 15/15 checks pass
-pytest                                            # 106 tests
-```
-
-Two steps intentionally do **not** bit-match this particular fixture because it
-predates the current code — both are documented PI decisions in
-[`FINDINGS.md`](FINDINGS.md). Regenerate fresh fixtures from the current MATLAB
-with [`validation/generate_fixtures.m`](validation/generate_fixtures.m).
+A loader's only job is to fill a
+[`Recording`](src/barrylab/core/recording.py) — a plain container you can
+poke at directly (`rec.xy`, `rec.speed`, `rec.direction`, `rec.pos_times`,
+`rec.electrode(n).spike_pos_index(cluster)`, ...). Every analysis function
+consumes that object (or arrays derived from it) and nothing else, so none of
+the code above will need to change when the Neuropixels front end lands. See
+[`docs/architecture.md`](docs/architecture.md) for the full design, and
+[`docs/adding_a_loader.md`](docs/adding_a_loader.md) if you're writing a new
+front end.
 
 ## Documentation
 
-- [`docs/getting_started.md`](docs/getting_started.md) — install, load a trial, make your first rate map.
-- [`docs/architecture.md`](docs/architecture.md) — the three-layer design and the `Recording` object.
-- [`docs/matlab_migration.md`](docs/matlab_migration.md) — where each `Universal_Matlab` function lands.
-- [`docs/adding_a_loader.md`](docs/adding_a_loader.md) — how to write a new front-end loader.
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, tests, and coding conventions.
-- [`FINDINGS.md`](FINDINGS.md) — validation notes, cross-function dependency gotchas, and known MATLAB quirks.
-- [`PORTING_PLAN.md`](PORTING_PLAN.md) — the master plan for porting everything still remaining, module by module.
+- [`docs/getting_started.md`](docs/getting_started.md) — install, load a trial, make your first rate map and figure.
+- [`docs/architecture.md`](docs/architecture.md) — the three-layer design (`io` → `core` → `analysis`) and the `Recording` object.
+- [`docs/matlab_migration.md`](docs/matlab_migration.md) — the complete `Universal_Matlab` function → `barrylab` function map, for anyone migrating existing analysis scripts.
+- [`docs/adding_a_loader.md`](docs/adding_a_loader.md) — how to write a new front-end loader (e.g. for a new acquisition system).
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, running tests, coding conventions.
 
-## Roadmap
+## Provenance & validation
 
-Full detail and per-function status in [`PORTING_PLAN.md`](PORTING_PLAN.md).
+Every ported function was checked numerically before being considered
+done — against a bit-exact MATLAB fixture where one exists, otherwise a
+synthetic case with known ground truth, an independent textbook/analytic
+oracle, or cross-consistency against an already-validated function (real
+data alone was never treated as sufficient). Any MATLAB bugs or quirks found
+along the way are documented rather than silently fixed, unless replicating
+one would leave the Python function simply broken. Full detail — the exact
+validation used for every function, and every MATLAB bug found — is in
+[`FINDINGS.md`](FINDINGS.md); remaining/deferred pieces are tracked in
+[`PORTING_PLAN.md`](PORTING_PLAN.md).
 
-- **v0.1** — DACQ loader, `Recording`, rate maps, Skaggs info, MATLAB validation harness. ✓
-- **v0.2** — spatial autocorrelogram + gridness ✓, head-direction tuning ✓, place-field/coherence/correlation stats ✓.
-- **v0.4** — Bayesian decoding (naive ML + full Bayes w/ movement prior) ✓, phase precession ✓.
-- **v0.5** — grid ellipse correction ✓; 2-D FFT grid analysis + cross-SAC still to come.
-- **v0.6** — LFP/EEG loading + power spectrum ✓; instantaneous freq/power and ripple detection still to come.
-- **v0.7 (in progress)** — watershed field segmentation ✓ (`barrylab[fieldshuffle]`); the field-reallocation shuffle itself and `identify_grid_cell` orchestration remain.
-- **v0.3 / v1.0** — Neuropixels front end (SpikeGLX + Open Ephys via SpikeInterface + Kilosort4), NWB export, plugin loader API, human review of the whole port.
+**No lab member has independently reviewed this port line-by-line yet.** If
+you use it for real analysis, sanity-check results that matter against the
+MATLAB toolbox, and open an issue if anything looks off.
 
 ## License
 

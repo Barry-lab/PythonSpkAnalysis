@@ -27,7 +27,7 @@ keep them optional.
 ## Running the tests
 
 ```bash
-pytest          # 17 tests
+pytest          # 140+ tests (count grows as the port progresses)
 ```
 
 Tests live under `tests/` and run against fixtures checked into the repo, so no MATLAB
