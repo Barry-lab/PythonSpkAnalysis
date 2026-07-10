@@ -15,12 +15,13 @@ def _hex_grid_map(n=61, spacing=12.0, sigma=2.5, offset=(0.0, 0.0)):
     for i in range(-5, 6):
         for j in range(-5, 6):
             c = i * a1 + j * a2 + centre
-            m += np.exp(-((xx - c[0]) ** 2 + (yy - c[1]) ** 2) / (2 * sigma ** 2))
+            m += np.exp(-((xx - c[0]) ** 2 + (yy - c[1]) ** 2) / (2 * sigma**2))
     return m
 
 
-def _clean_xsac_with_known_peaks(n=41, central_offset=(3, -2), radius=8,
-                                  neighbour_angles_deg=(10, 70, 130, 190, 250, 310)):
+def _clean_xsac_with_known_peaks(
+    n=41, central_offset=(3, -2), radius=8, neighbour_angles_deg=(10, 70, 130, 190, 250, 310)
+):
     """A hand-built xSAC with exactly-known peak positions and no flat/tied
     regions, isolating the geometry math from the zero-clipping fragility
     documented in cross_sac_props' docstring (see also FINDINGS.md)."""
@@ -77,6 +78,7 @@ def test_cross_sac_props_requires_at_least_seven_peaks():
     xsac = 0.001 * (np.arange(n)[:, None] + 1.3 * np.arange(n)[None, :])
     xsac[10, 10] = 10.0  # a single unambiguous peak only
     import pytest
+
     with pytest.raises(ValueError):
         cross_sac_props(xsac)
 

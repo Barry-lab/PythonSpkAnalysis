@@ -63,14 +63,14 @@ def _pearson_all_lags(seq1, seq2, mode="full"):
     s1xs2 = _filter2(s1, s2, mode)
     sum1 = _filter2(s1, ones2, mode)
     sum2 = _filter2(ones1, s2, mode)
-    sum1sq = _filter2(s1 ** 2, ones2, mode)
-    sum2sq = _filter2(ones1, s2 ** 2, mode)
+    sum1sq = _filter2(s1**2, ones2, mode)
+    sum2sq = _filter2(ones1, s2**2, mode)
     n = _filter2(ones1, ones2, mode)
-    n_sq = n ** 2
+    n_sq = n**2
 
     with np.errstate(divide="ignore", invalid="ignore"):
-        std1 = np.sqrt(sum1sq / n - sum1 ** 2 / n_sq)
-        std2 = np.sqrt(sum2sq / n - sum2 ** 2 / n_sq)
+        std1 = np.sqrt(sum1sq / n - sum1**2 / n_sq)
+        std2 = np.sqrt(sum2sq / n - sum2**2 / n_sq)
         covar = s1xs2 / n - (sum1 * sum2) / n_sq
         coef = covar / (std1 * std2)
     return np.real(coef), n
@@ -161,17 +161,17 @@ def _sac_peaks(sac, n_closest=7):
     y1 = com[:, 0] + 1.0
     cy, cx = np.ceil(np.array(sac.shape) / 2.0)  # central bin, 1-based
     xy_central = np.column_stack([x1 - cx, y1 - cy])
-    dist = np.sqrt((xy_central ** 2).sum(axis=1))
+    dist = np.sqrt((xy_central**2).sum(axis=1))
 
     order = np.argsort(dist)
     closest = order[:n_closest] if len(order) >= n_closest else order
     return {
         "filled": filled,
         "central": (cy, cx),
-        "label_ids": (closest + 1),                       # 1-based label ids
+        "label_ids": (closest + 1),  # 1-based label ids
         "dist": dist[closest],
-        "xy_central": xy_central[closest],                # includes centre as row 0
-        "peak_rc": np.rint(com[closest]).astype(int),     # 0-based (row, col)
+        "xy_central": xy_central[closest],  # includes centre as row 0
+        "peak_rc": np.rint(com[closest]).astype(int),  # 0-based (row, col)
     }
 
 
@@ -237,7 +237,7 @@ def gridness(sac):
     filled = peaks["filled"]
     field = _peak_fields(filled, peaks)
     cy, cx = peaks["central"]
-    yy, xx = np.mgrid[1:filled.shape[0] + 1, 1:filled.shape[1] + 1]
+    yy, xx = np.mgrid[1 : filled.shape[0] + 1, 1 : filled.shape[1] + 1]
     centre_radi = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2)
     max_allow = int(np.min(np.floor(np.array(filled.shape) / 2.0)))
     central_id = peaks["label_ids"][0]
@@ -280,8 +280,13 @@ def grid_properties(sac):
     """
     peaks = _sac_peaks(sac)
     if peaks is None or len(peaks["label_ids"]) < 2:
-        return {"scale": np.nan, "gridness": np.nan, "orientation": np.array([]),
-                "peak_coord": np.empty((0, 2)), "mean_r": np.nan}
+        return {
+            "scale": np.nan,
+            "gridness": np.nan,
+            "orientation": np.array([]),
+            "peak_coord": np.empty((0, 2)),
+            "mean_r": np.nan,
+        }
 
     filled = peaks["filled"]
     scale = float(np.median(peaks["dist"][1:]))  # exclude central peak
@@ -289,7 +294,7 @@ def grid_properties(sac):
     # Orientation: polar angle of peaks above the x-axis (y negated for image frame).
     xy = peaks["xy_central"]
     theta = np.arctan2(-xy[:, 1], xy[:, 0])
-    keep = (theta >= 0)
+    keep = theta >= 0
     keep[0] = False  # drop the central point
     orientation = np.degrees(np.sort(theta[keep]))
 
@@ -299,12 +304,24 @@ def grid_properties(sac):
     standard, _ = gridness(sac)
     # (x, y) with origin top-left = 0-based col, row + 1 back to MATLAB 1-based.
     peak_coord = np.column_stack([peaks["peak_rc"][:, 1] + 1, peaks["peak_rc"][:, 0] + 1])
-    return {"scale": scale, "gridness": standard, "orientation": orientation,
-            "peak_coord": peak_coord, "mean_r": mean_r}
+    return {
+        "scale": scale,
+        "gridness": standard,
+        "orientation": orientation,
+        "peak_coord": peak_coord,
+        "mean_r": mean_r,
+    }
 
 
-def grid_score(recording, electrode, cluster, bin_cm=2.0, smoothing="boxcar",
-               smooth_size=None, min_overlap=None):
+def grid_score(
+    recording,
+    electrode,
+    cluster,
+    bin_cm=2.0,
+    smoothing="boxcar",
+    smooth_size=None,
+    min_overlap=None,
+):
     """Convenience: rate map -> SAC -> standard gridness for one cluster.
 
     Returns
@@ -312,8 +329,9 @@ def grid_score(recording, electrode, cluster, bin_cm=2.0, smoothing="boxcar",
     (standard_gridness, scale_cm)
         Standard gridness and grid scale converted to cm (bins * ``bin_cm``).
     """
-    rm = rate_map(recording, electrode, cluster, bin_cm=bin_cm,
-                  smoothing=smoothing, smooth_size=smooth_size)
+    rm = rate_map(
+        recording, electrode, cluster, bin_cm=bin_cm, smoothing=smoothing, smooth_size=smooth_size
+    )
     sac = spatial_autocorrelogram(rm, min_overlap=min_overlap)
     props = grid_properties(sac)
     return props["gridness"], props["scale"] * bin_cm
@@ -383,8 +401,12 @@ def square_grid_props(sac):
     """
     peaks = _sac_peaks(sac, n_closest=5)
     if peaks is None:
-        return {"scale": np.array([np.nan]), "gridness": float("nan"),
-                "orientation": np.array([np.nan]), "peak_coord": np.empty((0, 2))}
+        return {
+            "scale": np.array([np.nan]),
+            "gridness": float("nan"),
+            "orientation": np.array([np.nan]),
+            "peak_coord": np.empty((0, 2)),
+        }
 
     filled = peaks["filled"]
     dist = peaks["dist"]
@@ -407,7 +429,7 @@ def square_grid_props(sac):
     else:
         field = _peak_fields(filled, peaks)
         cy, cx = peaks["central"]
-        yy, xx = np.mgrid[1:filled.shape[0] + 1, 1:filled.shape[1] + 1]
+        yy, xx = np.mgrid[1 : filled.shape[0] + 1, 1 : filled.shape[1] + 1]
         centre_radi = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2)
         max_allow = int(np.min(np.floor(np.array(filled.shape) / 2.0)))
         central_id = peaks["label_ids"][0]
@@ -424,8 +446,12 @@ def square_grid_props(sac):
         gridness90 = _rotational_gridness_90(filled, mask)
 
     peak_coord = np.column_stack([peaks["peak_rc"][:, 1] + 1, peaks["peak_rc"][:, 0] + 1])
-    return {"scale": scale, "gridness": gridness90, "orientation": orientation,
-            "peak_coord": peak_coord}
+    return {
+        "scale": scale,
+        "gridness": gridness90,
+        "orientation": orientation,
+        "peak_coord": peak_coord,
+    }
 
 
 # --------------------------------------------------------------------------
@@ -449,7 +475,7 @@ def _regional_minima_1d(x):
         left_ok = (i == 0) or (x[i - 1] > x[i])
         right_ok = (j == n - 1) or (x[j + 1] > x[j])
         if left_ok and right_ok:
-            is_min[i:j + 1] = True
+            is_min[i : j + 1] = True
         i = j + 1
     return is_min
 
@@ -533,7 +559,7 @@ def fast_gridness(sac):
     central_col = int(np.ceil(n_cols / 2.0))
     dx = (xs + 1.0) - central_col
     dy = (ys + 1.0) - central_row
-    dist = np.sqrt(dx ** 2 + dy ** 2)
+    dist = np.sqrt(dx**2 + dy**2)
 
     order = np.argsort(dist, kind="stable")
     n_take = min(7, order.size)
@@ -552,7 +578,7 @@ def fast_gridness(sac):
 
     # Rounded (integer-bin) distance-from-centre grid, used for every
     # radius/mask comparison below -- see divergence (3) in the docstring.
-    yy, xx = np.mgrid[1:n_rows + 1, 1:n_cols + 1]
+    yy, xx = np.mgrid[1 : n_rows + 1, 1 : n_cols + 1]
     dist_grid = np.floor(np.sqrt((xx - central_col) ** 2 + (yy - central_row) ** 2) + 0.5)
     half_min_sz = int(np.min(np.floor(np.array([n_rows, n_cols]) / 2.0)))
 

@@ -19,12 +19,14 @@ def test_histnd_2d_matches_hand_computation():
 
 def test_histnd_3d_basic():
     # 2 direction bins x 2x2 position bins; one point per bin
-    data = np.array([
-        [0.5, 0.5, 0.5],
-        [0.5, 0.5, 1.5],
-        [1.5, 1.5, 0.5],
-        [1.5, 1.5, 1.5],
-    ])
+    data = np.array(
+        [
+            [0.5, 0.5, 0.5],
+            [0.5, 0.5, 1.5],
+            [1.5, 1.5, 0.5],
+            [1.5, 1.5, 1.5],
+        ]
+    )
     counts, _ = histnd(data, np.array([2.0, 2.0, 2.0]), 1.0)
     assert counts.shape == (2, 2, 2)
     assert counts.sum() == 4
@@ -79,6 +81,7 @@ def test_pxd_recovers_separable_place_and_direction_tuning():
 
 def test_pxd_rejects_mismatched_shapes():
     import pytest
+
     with pytest.raises(ValueError):
         pxd(np.ones((2, 3, 3)), np.ones((2, 4, 4)))
 
@@ -122,11 +125,21 @@ def test_place_by_direction_uses_correct_x_extent_on_non_square_window():
     direction = rng.uniform(0, 360, n_pos)
 
     spk_idx = rng.choice(n_pos, size=300, replace=False)
-    elec = Electrode(identifier=1, spike_times=spk_idx / 50.0, pos_index=spk_idx,
-                     clusters=np.ones(300, dtype=int))
-    rec = Recording(name="synthetic", xy=xy, direction=direction,
-                    pos_sample_rate=50.0, pixels_per_metre=100.0,
-                    window=(0.0, 300.0, 0.0, 100.0), electrodes={1: elec})
+    elec = Electrode(
+        identifier=1,
+        spike_times=spk_idx / 50.0,
+        pos_index=spk_idx,
+        clusters=np.ones(300, dtype=int),
+    )
+    rec = Recording(
+        name="synthetic",
+        xy=xy,
+        direction=direction,
+        pos_sample_rate=50.0,
+        pixels_per_metre=100.0,
+        window=(0.0, 300.0, 0.0, 100.0),
+        electrodes={1: elec},
+    )
 
     p, d = bl.place_by_direction(rec, 1, 1, bin_cm=10.0)
     ny, nx = p.shape

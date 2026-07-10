@@ -9,12 +9,10 @@ Kept as a plain, transparent container (arrays + light metadata) so a student
 can inspect every field. It intentionally has no file-format knowledge.
 """
 
-from typing import Dict
-
 import numpy as np
 
 
-class Electrode(object):
+class Electrode:
     """Sorted spikes from one recording channel-group (a tetrode, or a probe).
 
     Attributes
@@ -32,8 +30,7 @@ class Electrode(object):
         Raw acquisition header, kept for provenance.
     """
 
-    def __init__(self, identifier, spike_times, pos_index=None,
-                 clusters=None, metadata=None):
+    def __init__(self, identifier, spike_times, pos_index=None, clusters=None, metadata=None):
         self.identifier = identifier
         self.spike_times = np.asarray(spike_times)
         self.pos_index = None if pos_index is None else np.asarray(pos_index)
@@ -54,7 +51,7 @@ class Electrode(object):
         ``easy_make_ratemap`` behaviour).
         """
         if self.clusters is None:
-            raise ValueError("electrode %r has no cluster (cut) data" % (self.identifier,))
+            raise ValueError(f"electrode {self.identifier!r} has no cluster (cut) data")
         mask = self.clusters == cluster
         if self.pos_index is not None:
             mask = mask[: len(self.pos_index)]
@@ -63,17 +60,19 @@ class Electrode(object):
     def spike_pos_index(self, cluster):
         """Position-sample indices of spikes from ``cluster`` (0-based)."""
         if self.pos_index is None:
-            raise ValueError("electrode %r has no position mapping" % (self.identifier,))
+            raise ValueError(f"electrode {self.identifier!r} has no position mapping")
         return self.pos_index[self.spike_mask(cluster)]
 
     def __repr__(self):
         n_clusters = len(self.cluster_ids())
         return "Electrode(id=%r, n_spikes=%d, n_clusters=%d)" % (
-            self.identifier, self.spike_times.size, n_clusters,
+            self.identifier,
+            self.spike_times.size,
+            n_clusters,
         )
 
 
-class Recording(object):
+class Recording:
     """A single recording session: position/behaviour plus sorted spikes.
 
     Attributes
@@ -105,9 +104,20 @@ class Recording(object):
         Free-form provenance (source path, format, raw headers).
     """
 
-    def __init__(self, name, xy=None, direction=None, speed=None,
-                 pos_times=None, pos_sample_rate=None, pixels_per_metre=None,
-                 window=None, electrodes=None, lfp=None, metadata=None):
+    def __init__(
+        self,
+        name,
+        xy=None,
+        direction=None,
+        speed=None,
+        pos_times=None,
+        pos_sample_rate=None,
+        pixels_per_metre=None,
+        window=None,
+        electrodes=None,
+        lfp=None,
+        metadata=None,
+    ):
         self.name = name
         self.xy = xy
         self.direction = direction
@@ -140,5 +150,7 @@ class Recording(object):
 
     def __repr__(self):
         return "Recording(name=%r, n_pos=%d, electrodes=%s)" % (
-            self.name, self.n_pos, sorted(self.electrodes),
+            self.name,
+            self.n_pos,
+            sorted(self.electrodes),
         )

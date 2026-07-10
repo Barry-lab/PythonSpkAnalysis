@@ -37,7 +37,7 @@ def _fit_ellipse(x, y):
     x = x - mean_x
     y = y - mean_y
 
-    design = np.column_stack([x ** 2, x * y, y ** 2, x, y])
+    design = np.column_stack([x**2, x * y, y**2, x, y])
     coeffs, *_ = np.linalg.lstsq(design.T @ design, design.T @ np.ones_like(x), rcond=None)
     a, b, c, d, e = coeffs
 
@@ -46,9 +46,9 @@ def _fit_ellipse(x, y):
         orientation_rad = 0.5 * np.arctan2(b, c - a)
         cos_phi, sin_phi = np.cos(orientation_rad), np.sin(orientation_rad)
         a, b, c, d, e = (
-            a * cos_phi ** 2 - b * cos_phi * sin_phi + c * sin_phi ** 2,
+            a * cos_phi**2 - b * cos_phi * sin_phi + c * sin_phi**2,
             0.0,
-            a * sin_phi ** 2 + b * cos_phi * sin_phi + c * cos_phi ** 2,
+            a * sin_phi**2 + b * cos_phi * sin_phi + c * cos_phi**2,
             d * cos_phi - e * sin_phi,
             d * sin_phi + e * cos_phi,
         )
@@ -65,7 +65,7 @@ def _fit_ellipse(x, y):
 
     x0 = mean_x - d / (2 * a)
     y0 = mean_y - e / (2 * c)
-    f = 1 + (d ** 2) / (4 * a) + (e ** 2) / (4 * c)
+    f = 1 + (d**2) / (4 * a) + (e**2) / (4 * c)
     semi_a, semi_b = np.sqrt(f / a), np.sqrt(f / c)
 
     return {"a": semi_a, "b": semi_b, "phi": orientation_rad, "x0": x0, "y0": y0}
@@ -94,8 +94,12 @@ def fit_grid_ellipse(sac):
         ``ab_scale`` — ``(a, b)`` major/minor semi-axis lengths, in bins.
     """
     peaks = _sac_peaks(sac)
-    nan_result = {"xy_scale": (np.nan, np.nan), "eccentricity": np.nan,
-                  "orientation": np.nan, "ab_scale": (np.nan, np.nan)}
+    nan_result = {
+        "xy_scale": (np.nan, np.nan),
+        "eccentricity": np.nan,
+        "orientation": np.nan,
+        "ab_scale": (np.nan, np.nan),
+    }
     if peaks is None or len(peaks["label_ids"]) < 7:
         return nan_result
 
@@ -113,15 +117,19 @@ def fit_grid_ellipse(sac):
         a, b = b, a
         orient = np.mod(orient + np.pi / 2, 2 * np.pi)
 
-    eccentricity = np.sqrt((a ** 2 - b ** 2) / a ** 2)
+    eccentricity = np.sqrt((a**2 - b**2) / a**2)
 
     theta_axes = np.array([orient, np.pi / 2 + orient])
     ellipse_x = a * np.cos(theta_axes)
     ellipse_y = b * np.sin(theta_axes)
-    xy_scale = np.sqrt(ellipse_x ** 2 + ellipse_y ** 2)
+    xy_scale = np.sqrt(ellipse_x**2 + ellipse_y**2)
 
-    return {"xy_scale": tuple(xy_scale), "eccentricity": float(eccentricity),
-            "orientation": float(orient), "ab_scale": (float(a), float(b))}
+    return {
+        "xy_scale": tuple(xy_scale),
+        "eccentricity": float(eccentricity),
+        "orientation": float(orient),
+        "ab_scale": (float(a), float(b)),
+    }
 
 
 def regularise_elliptic_sac(sac, ab_scale, orient_deg):
@@ -180,7 +188,7 @@ def regularise_elliptic_sac(sac, ab_scale, orient_deg):
     # only the central portion... so that it matches the original size").
     start_row = (reg.shape[0] - sac.shape[0]) // 2
     start_col = (reg.shape[1] - sac.shape[1]) // 2
-    reg = reg[start_row: start_row + sac.shape[0], start_col: start_col + sac.shape[1]]
+    reg = reg[start_row : start_row + sac.shape[0], start_col : start_col + sac.shape[1]]
     return reg
 
 
@@ -249,10 +257,10 @@ def brandon_regularise(sac):
     dy = (peak_m + 1.0) - central_row
     # "Not euclidian" (MATLAB's own comment) -- squared, unrooted distance,
     # used only to rank/sort peaks so the monotonic transform doesn't matter.
-    dist_sq = dx ** 2 + dy ** 2
+    dist_sq = dx**2 + dy**2
     order = np.argsort(dist_sq, kind="stable")
     # closestPeaks(2:min(7,length)) -- drop index 0, the central peak itself.
-    closest = order[1:min(7, order.size)]
+    closest = order[1 : min(7, order.size)]
 
     if closest.size < 4:
         return sac.copy(), sac.copy()
@@ -273,12 +281,12 @@ def brandon_regularise(sac):
     # Method 1: minor axis set to the closest peak; estimate major axis.
     m1_min_r = close_r
     m1_maj_th = np.mod(close_ang + np.pi / 2, 2 * np.pi)
-    m1_maj_r = csqrt(cos_sq_th / ((sin_sq_th / close_r ** 2) - (dist_r ** -2)))
+    m1_maj_r = csqrt(cos_sq_th / ((sin_sq_th / close_r**2) - (dist_r**-2)))
 
     # Method 2: major axis set to the furthest peak; estimate minor axis.
     m2_maj_r = dist_r
     m2_maj_th = np.mod(dist_ang, 2 * np.pi)
-    m2_min_r = csqrt(sin_sq_th / ((close_r ** -2) - (cos_sq_th / dist_r ** 2)))
+    m2_min_r = csqrt(sin_sq_th / ((close_r**-2) - (cos_sq_th / dist_r**2)))
 
     if abs(m1_maj_r) > 2 * abs(m1_min_r):
         rsac1 = sac.copy()

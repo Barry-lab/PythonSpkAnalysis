@@ -98,12 +98,12 @@ def _read_cut(path):
     line, ``n`` cluster ids follow (possibly across several lines). A bare
     ``.clu`` file is just the list of ids.
     """
-    with open(path, "r") as fh:
+    with open(path) as fh:
         tokens = fh.read().split()
     if "Exact_cut_for:" in tokens:
         start = tokens.index("spikes:", tokens.index("Exact_cut_for:"))
         n_spikes = int(tokens[start + 1])
-        ids = tokens[start + 2: start + 2 + n_spikes]
+        ids = tokens[start + 2 : start + 2 + n_spikes]
         return np.array([int(x) for x in ids], dtype=int)
     # Bare .clu: an optional leading count then one id per spike.
     ids = [int(t) for t in tokens if t.lstrip("-").isdigit()]
@@ -279,7 +279,8 @@ def write_cut(spike_assignment, dir_path, file_stem, tetrode_no, max_cluster_war
     if max_cluster > max_cluster_warn:
         warnings.warn(
             "Cluster assignments exceed the max allowed (%d) -- might not be "
-            "compatible with Tint." % max_cluster_warn
+            "compatible with Tint." % max_cluster_warn,
+            stacklevel=2,
         )
 
     full_path = os.path.join(dir_path, "%s_%d.cut" % (file_stem, tetrode_no))
@@ -301,9 +302,9 @@ def write_cut(spike_assignment, dir_path, file_stem, tetrode_no, max_cluster_war
         # trailing line terminator after the very last value.
         n_full_rows = max(0, -(-n_spikes // 25) - 1)  # ceil(n_spikes / 25) - 1
         for row in range(n_full_rows):
-            chunk = spike_assignment[row * 25: row * 25 + 25]
+            chunk = spike_assignment[row * 25 : row * 25 + 25]
             fh.write("".join("  %d" % v for v in chunk) + "\r\n")
-        tail = spike_assignment[n_full_rows * 25:]
+        tail = spike_assignment[n_full_rows * 25 :]
         fh.write("".join("  %d" % v for v in tail))
 
     return full_path
@@ -374,7 +375,7 @@ def eeg_convert_to_volts(samples, eeg_channel, settings, kind="eeg"):
     adc_fullscale = key_value(settings, "ADC_fullscale_mv", "num")
     conv_factor = {1500.0: 1.5, 3680.0: 3.68, 3000.0: 3.00}.get(adc_fullscale)
     if conv_factor is None:
-        raise ValueError("unrecognised ADC_fullscale_mv %r in settings" % (adc_fullscale,))
+        raise ValueError(f"unrecognised ADC_fullscale_mv {adc_fullscale!r} in settings")
 
     samples = np.asarray(samples, dtype=np.float64)
     if kind == "eeg":
@@ -402,8 +403,8 @@ def _active_eeg_channels(settings, max_channels=16):
 def _load_lfp_channel(stem, channel, settings):
     """Load one EEG channel's data (prefers the high-rate .egf if present)."""
     suffix = "" if channel == 1 else str(channel)
-    egf_path = "%s.egf%s" % (stem, suffix)
-    eeg_path = "%s.eeg%s" % (stem, suffix)
+    egf_path = f"{stem}.egf{suffix}"
+    eeg_path = f"{stem}.eeg{suffix}"
 
     if os.path.exists(egf_path):
         raw, header = _read_egf(egf_path)
@@ -423,9 +424,14 @@ def _load_lfp_channel(stem, channel, settings):
     }
 
 
-def load_dacq(path, load_position=True, load_lfp=False,
-              max_speed=POS_MAX_SPEED_MS, box_car=POS_SMOOTH_BOXCAR_S,
-              head_pos_weighting="tracking"):
+def load_dacq(
+    path,
+    load_position=True,
+    load_lfp=False,
+    max_speed=POS_MAX_SPEED_MS,
+    box_car=POS_SMOOTH_BOXCAR_S,
+    head_pos_weighting="tracking",
+):
     """Load a raw Axona/DACQ trial into a :class:`Recording`.
 
     Parameters
@@ -461,8 +467,12 @@ def load_dacq(path, load_position=True, load_lfp=False,
     if load_position and os.path.exists(stem + ".pos"):
         led_pos, led_pix, pos_header = _read_pos(stem + ".pos")
         pos = _position.postprocess_pos_data(
-            led_pos, led_pix, pos_header, settings,
-            max_speed=max_speed, box_car=box_car,
+            led_pos,
+            led_pix,
+            pos_header,
+            settings,
+            max_speed=max_speed,
+            box_car=box_car,
             head_pos_weighting=head_pos_weighting,
         )
         sample_rate = key_value(pos_header, "sample_rate", "num")
@@ -509,7 +519,9 @@ def load_dacq(path, load_position=True, load_lfp=False,
 
     # --- LFP (.eeg / .egf) ----------------------------------------------
     if load_lfp:
-        channels = load_lfp if isinstance(load_lfp, (list, tuple)) else _active_eeg_channels(settings)
+        channels = (
+            load_lfp if isinstance(load_lfp, (list, tuple)) else _active_eeg_channels(settings)
+        )
         for ch in channels:
             channel_data = _load_lfp_channel(stem, ch, settings)
             if channel_data is not None:

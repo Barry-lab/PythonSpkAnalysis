@@ -21,7 +21,7 @@ def test_histnd_clamps_out_of_range():
     data = np.array([[99.0, 99.0], [-5.0, -5.0]])
     out = _histnd_2d(data, [3, 3], 1.0)
     assert out[-1, -1] == 1  # high point clamps to last bin
-    assert out[0, 0] == 1    # low point clamps to first bin
+    assert out[0, 0] == 1  # low point clamps to first bin
 
 
 def test_histnd_drops_nan_rows():

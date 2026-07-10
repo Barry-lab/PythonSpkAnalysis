@@ -152,8 +152,12 @@ def spatial_correlation(rate_map1, rate_map2, stack_maps=True):
     stack_size = a.shape[2]
     max_shape = (max(a.shape[0], b.shape[0]), max(a.shape[1], b.shape[1]))
 
-    interp_a = np.stack([_resize_bilinear(a[:, :, k], max_shape) for k in range(stack_size)], axis=2)
-    interp_b = np.stack([_resize_bilinear(b[:, :, k], max_shape) for k in range(stack_size)], axis=2)
+    interp_a = np.stack(
+        [_resize_bilinear(a[:, :, k], max_shape) for k in range(stack_size)], axis=2
+    )
+    interp_b = np.stack(
+        [_resize_bilinear(b[:, :, k], max_shape) for k in range(stack_size)], axis=2
+    )
 
     mask = ((interp_a == 0) & (interp_b == 0)) | np.isnan(interp_a) | np.isnan(interp_b)
     n_valid_bins = int(np.sum(~mask))
@@ -166,6 +170,8 @@ def spatial_correlation(rate_map1, rate_map2, stack_maps=True):
         for k in range(stack_size):
             valid_k = ~mask[:, :, k]
             if valid_k.sum() >= 2:
-                spatial_corr[k] = np.corrcoef(interp_a[:, :, k][valid_k], interp_b[:, :, k][valid_k])[0, 1]
+                spatial_corr[k] = np.corrcoef(
+                    interp_a[:, :, k][valid_k], interp_b[:, :, k][valid_k]
+                )[0, 1]
 
     return spatial_corr, n_valid_bins

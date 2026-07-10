@@ -78,7 +78,7 @@ def test_field_stats_rejects_field_below_min_rate():
 
 def test_spatial_coherence_smooth_field_is_higher_than_noise():
     yy, xx = np.mgrid[0:30, 0:30]
-    smooth = np.exp(-((xx - 15) ** 2 + (yy - 15) ** 2) / (2 * 5.0 ** 2))
+    smooth = np.exp(-((xx - 15) ** 2 + (yy - 15) ** 2) / (2 * 5.0**2))
     rng = np.random.RandomState(0)
     noisy = rng.rand(30, 30)
     assert spatial_coherence(smooth) > spatial_coherence(noisy)
@@ -162,7 +162,7 @@ def test_true_ppm_bounding_box_no_visited_bins():
 
 def test_true_ppm_bounding_box_picks_largest_region():
     occ = np.zeros((30, 30))
-    occ[1:3, 1:3] = 1.0     # small region, 4 bins
+    occ[1:3, 1:3] = 1.0  # small region, 4 bins
     occ[10:20, 10:20] = 1.0  # large region, 100 bins
     ppm, i_range, _ = true_ppm_bounding_box(occ, bin_size_px=1.0, env_size_m=1.0)
     assert 10 in i_range  # picked the large region, not the small one

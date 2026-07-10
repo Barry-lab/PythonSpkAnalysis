@@ -16,13 +16,13 @@ import numpy as np
 from scipy.special import gammaln
 
 from ..params import (
+    DIR_BIN_DEG,
     PXD_ACCURACY,
     PXD_DIR_SMOOTH_BINS,
     PXD_MAX_ITER,
     PXD_POS_BIN_CM,
     PXD_POS_SMOOTH_BINS,
     PXD_TOL,
-    DIR_BIN_DEG,
 )
 from ._binning import histnd
 from .maps import smooth_ratemap
@@ -94,7 +94,7 @@ def pxd(spikes, times, max_iter=PXD_MAX_ITER, accuracy=PXD_ACCURACY, tol=PXD_TOL
             break
 
     if not converged:
-        warnings.warn("pxd did not converge, returning nan")
+        warnings.warn("pxd did not converge, returning nan", stacklevel=2)
         return float("nan"), float("nan")
 
     total_spikes = spikes.sum()
@@ -109,11 +109,19 @@ def pxd(spikes, times, max_iter=PXD_MAX_ITER, accuracy=PXD_ACCURACY, tol=PXD_TOL
     return p, d
 
 
-def place_by_direction(recording, electrode, cluster,
-                       bin_cm=PXD_POS_BIN_CM, dir_bin_deg=DIR_BIN_DEG,
-                       smooth=True, pos_smooth_bins=PXD_POS_SMOOTH_BINS,
-                       dir_smooth_bins=PXD_DIR_SMOOTH_BINS,
-                       max_iter=PXD_MAX_ITER, accuracy=PXD_ACCURACY, tol=PXD_TOL):
+def place_by_direction(
+    recording,
+    electrode,
+    cluster,
+    bin_cm=PXD_POS_BIN_CM,
+    dir_bin_deg=DIR_BIN_DEG,
+    smooth=True,
+    pos_smooth_bins=PXD_POS_SMOOTH_BINS,
+    dir_smooth_bins=PXD_DIR_SMOOTH_BINS,
+    max_iter=PXD_MAX_ITER,
+    accuracy=PXD_ACCURACY,
+    tol=PXD_TOL,
+):
     """Bin one cluster's spikes by (direction, position) and fit the pxd model.
 
     Port of ``wrapper_pxd.m``: bins raw position/direction/spike data into the
@@ -163,9 +171,13 @@ def place_by_direction(recording, electrode, cluster,
     data_ranges = np.array([[360.0, max_y, max_x], [0.0, min_y, min_x]])
     bin_size = np.array([dir_bin_deg, bin_px, bin_px])
 
-    spk_dir_pos = np.column_stack([
-        recording.direction[spk_idx], recording.xy[spk_idx, 1], recording.xy[spk_idx, 0],
-    ])
+    spk_dir_pos = np.column_stack(
+        [
+            recording.direction[spk_idx],
+            recording.xy[spk_idx, 1],
+            recording.xy[spk_idx, 0],
+        ]
+    )
     all_dir_pos = np.column_stack([recording.direction, recording.xy[:, 1], recording.xy[:, 0]])
 
     spike_bin, _ = histnd(spk_dir_pos, data_ranges, bin_size)

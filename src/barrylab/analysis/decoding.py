@@ -33,7 +33,7 @@ from .maps import smooth_ratemap, spike_map
 # was never propagated to decode_calcBayesPost.m, which still uses the old,
 # ineffective eps^8. Kept as two separate constants matching each function's
 # actual current MATLAB source, rather than one shared value -- see FINDINGS.md.
-_SMALL_V_CALC_POST = np.finfo(float).eps       # decode_calcPost.m (fixed upstream 2020)
+_SMALL_V_CALC_POST = np.finfo(float).eps  # decode_calcPost.m (fixed upstream 2020)
 _SMALL_V_BAYES_POST = np.finfo(float).eps ** 8  # decode_calcBayesPost.m (not yet fixed upstream)
 
 
@@ -41,13 +41,12 @@ def _gaussian_kernel_1d(sigma):
     """Matches MATLAB ``fspecial('gaussian', [1, ceil(5*sigma)], sigma)``."""
     n = int(np.ceil(sigma * 5))
     x = np.arange(n) - (n - 1) / 2.0
-    h = np.exp(-(x ** 2) / (2 * sigma ** 2))
+    h = np.exp(-(x**2) / (2 * sigma**2))
     h[h < np.finfo(float).eps * h.max()] = 0.0
     return h / h.sum()
 
 
-def spike_counts_per_window(spike_pos, start_end_pos, win_width,
-                            win_overlap=0.0, win_smooth=0.0):
+def spike_counts_per_window(spike_pos, start_end_pos, win_width, win_overlap=0.0, win_smooth=0.0):
     """Spike counts per time window, with optional overlap/smoothing.
 
     Port of ``decode_getSpkCnt.m``. All positions/widths are in position-sample
@@ -151,8 +150,9 @@ def bayesian_posterior(obs_spk, rate_maps, t_bin, normalise=True):
     return post
 
 
-def bayesian_posterior_with_prior(obs_spk, rate_maps, dwell_map, t_bin,
-                                  n_step_for_vel=15, speed_scale_fact=5.0):
+def bayesian_posterior_with_prior(
+    obs_spk, rate_maps, dwell_map, t_bin, n_step_for_vel=15, speed_scale_fact=5.0
+):
     """Full Bayesian decoder: spike likelihood x spatial prior x movement prior.
 
     Port of ``decode_calcBayesPost.m`` (Zhang et al. 1998, eq. 36 + a sequential
@@ -209,7 +209,7 @@ def bayesian_posterior_with_prior(obs_spk, rate_maps, dwell_map, t_bin,
         post[:, :, n] = post[:, :, n] * p_new_x_given_x
 
         if n >= n_step_for_vel:
-            p_new_x_given_x = np.exp(-(((xx - j_s) ** 2 + (yy - i_s) ** 2) / (2 * sigma ** 2)))
+            p_new_x_given_x = np.exp(-(((xx - j_s) ** 2 + (yy - i_s) ** 2) / (2 * sigma**2)))
             p_new_x_given_x = p_new_x_given_x / p_new_x_given_x.sum()
 
         # ML decode of this step's peak. MATLAB's max() ignores NaN (unless
@@ -295,8 +295,16 @@ def decode_maximum_likelihood(post, recording, bin_px, win_lim):
     return err, dec_xy, true_xy, ml_val
 
 
-def crunch_decode(recording, cells, t_bin=0.5, test_fraction=0.1,
-                  win_overlap=0.0, win_smooth=5.0, bin_cm=2.0, seed=None):
+def crunch_decode(
+    recording,
+    cells,
+    t_bin=0.5,
+    test_fraction=0.1,
+    win_overlap=0.0,
+    win_smooth=5.0,
+    bin_cm=2.0,
+    seed=None,
+):
     """End-to-end decode: build rate maps on a train split, decode a test split.
 
     A Recording-level redesign of ``decode_crunchData.m`` (not a bit-exact
@@ -358,7 +366,11 @@ def crunch_decode(recording, cells, t_bin=0.5, test_fraction=0.1,
         rate_maps.append(rm)
 
         counts, win_lim = spike_counts_per_window(
-            spk_idx_all, (test_start, test_end), win_width_samp, win_overlap, win_smooth,
+            spk_idx_all,
+            (test_start, test_end),
+            win_width_samp,
+            win_overlap,
+            win_smooth,
         )
         spike_counts.append(counts)
 
@@ -366,7 +378,9 @@ def crunch_decode(recording, cells, t_bin=0.5, test_fraction=0.1,
     spike_counts = np.stack(spike_counts, axis=0)
 
     post = bayesian_posterior(spike_counts, rate_maps, t_bin)
-    err_px, dec_xy_px, true_xy_px, ml_val = decode_maximum_likelihood(post, recording, bin_px, win_lim)
+    err_px, dec_xy_px, true_xy_px, ml_val = decode_maximum_likelihood(
+        post, recording, bin_px, win_lim
+    )
 
     ppm = recording.pixels_per_metre
     return {

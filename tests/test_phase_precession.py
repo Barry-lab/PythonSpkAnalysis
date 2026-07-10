@@ -6,10 +6,78 @@ from barrylab.analysis.phase_precession import _kempter_corr, circular_linear_re
 
 # Fisher (1993) dataset B.20 (p.252), example 6.9 (p.160) -- embedded in
 # circ_regress_cb.m's own docstring as a worked example.
-_FISHER_X = np.array([107, 46, 33, 67, 122, 69, 43, 30, 12, 25, 37, 69, 5, 83, 68,
-                      38, 21, 1, 71, 60, 71, 71, 57, 53, 38, 70, 7, 48, 7, 21, 27], dtype=float)
-_FISHER_T_DEG = np.array([67, 66, 74, 61, 58, 60, 100, 89, 171, 166, 98, 60, 197, 98, 86,
-                          123, 165, 133, 101, 105, 71, 84, 75, 98, 83, 71, 74, 91, 38, 200, 56], dtype=float)
+_FISHER_X = np.array(
+    [
+        107,
+        46,
+        33,
+        67,
+        122,
+        69,
+        43,
+        30,
+        12,
+        25,
+        37,
+        69,
+        5,
+        83,
+        68,
+        38,
+        21,
+        1,
+        71,
+        60,
+        71,
+        71,
+        57,
+        53,
+        38,
+        70,
+        7,
+        48,
+        7,
+        21,
+        27,
+    ],
+    dtype=float,
+)
+_FISHER_T_DEG = np.array(
+    [
+        67,
+        66,
+        74,
+        61,
+        58,
+        60,
+        100,
+        89,
+        171,
+        166,
+        98,
+        60,
+        197,
+        98,
+        86,
+        123,
+        165,
+        133,
+        101,
+        105,
+        71,
+        84,
+        75,
+        98,
+        83,
+        71,
+        74,
+        91,
+        38,
+        200,
+        56,
+    ],
+    dtype=float,
+)
 _FISHER_T = _FISHER_T_DEG * np.pi / 180.0
 
 
@@ -76,6 +144,7 @@ def test_circular_linear_regression_drops_nan_pairs():
 
 def test_circular_linear_regression_rejects_out_of_range_phase():
     import pytest
+
     with pytest.raises(ValueError):
         circular_linear_regression(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 10.0]), k=10)
 

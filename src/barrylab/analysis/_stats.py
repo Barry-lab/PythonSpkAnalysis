@@ -35,7 +35,7 @@ def nan_corr(var1, var2, corr_type="pearson"):
 
     corr_fn = _CORR_FUNCS.get(corr_type.lower())
     if corr_fn is None:
-        raise ValueError("corr_type must be one of %s" % (sorted(_CORR_FUNCS),))
+        raise ValueError(f"corr_type must be one of {sorted(_CORR_FUNCS)}")
 
     valid = np.isfinite(v1) & np.isfinite(v2)
     if valid.sum() == 0:

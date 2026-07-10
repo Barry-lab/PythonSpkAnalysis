@@ -73,6 +73,7 @@ def test_eeg_convert_to_volts_scales_by_adc_and_gain():
 
 def test_eeg_convert_to_volts_rejects_unknown_kind():
     import pytest
+
     from barrylab.io.axona import eeg_convert_to_volts
 
     settings = [("ADC_fullscale_mv", "1500"), ("gain_ch_0", "1000")]

@@ -114,8 +114,8 @@ def _disc_kernel(r, is_1d):
     if is_1d:
         return np.ones(int(1 + r * 2))
     n = int(np.ceil(r))
-    yy, xx = np.mgrid[-n:n + 1, -n:n + 1]
-    disc = (np.sqrt(xx ** 2 + yy ** 2) <= r).astype(float)
+    yy, xx = np.mgrid[-n : n + 1, -n : n + 1]
+    disc = (np.sqrt(xx**2 + yy**2) <= r).astype(float)
     return disc
 
 

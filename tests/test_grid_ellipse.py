@@ -20,7 +20,7 @@ def _hex_grid_map(n=81, spacing=10.0, sigma=2.0, stretch_x=1.0):
     for i in range(-5, 6):
         for j in range(-5, 6):
             c = i * a1 + j * a2 + centre
-            m += np.exp(-((xx - c[0]) ** 2 + (yy - c[1]) ** 2) / (2 * sigma ** 2))
+            m += np.exp(-((xx - c[0]) ** 2 + (yy - c[1]) ** 2) / (2 * sigma**2))
     return m
 
 
@@ -66,7 +66,7 @@ def test_fit_grid_ellipse_on_example_grid_cell(example_trial):
 
 def test_fit_grid_ellipse_nan_on_blob_without_six_peaks():
     yy, xx = np.mgrid[0:41, 0:41]
-    blob = np.exp(-((xx - 20) ** 2 + (yy - 20) ** 2) / (2 * 5.0 ** 2))
+    blob = np.exp(-((xx - 20) ** 2 + (yy - 20) ** 2) / (2 * 5.0**2))
     result = fit_grid_ellipse(blob)
     assert np.isnan(result["eccentricity"])
 
@@ -85,7 +85,9 @@ def test_regularise_elliptic_sac_runs_on_example_grid_cell(example_trial):
     rm = bl.rate_map(rec, 2, 3)
     sac = bl.spatial_autocorrelogram(rm)
     ellipse = bl.fit_grid_ellipse(sac)
-    corrected = bl.regularise_elliptic_sac(sac, ellipse["ab_scale"], np.degrees(ellipse["orientation"]))
+    corrected = bl.regularise_elliptic_sac(
+        sac, ellipse["ab_scale"], np.degrees(ellipse["orientation"])
+    )
 
     assert corrected.shape == sac.shape
     assert np.mean(np.isnan(corrected)) < 0.2  # mostly real values, not collapsed to NaN

@@ -45,8 +45,14 @@ def directional_occupancy(recording, bin_deg=DIR_BIN_DEG):
     return counts / recording.pos_sample_rate
 
 
-def head_direction_map(recording, electrode, cluster, bin_deg=DIR_BIN_DEG,
-                       smoothing="boxcar", smooth_size=DIR_SMOOTH_BINS):
+def head_direction_map(
+    recording,
+    electrode,
+    cluster,
+    bin_deg=DIR_BIN_DEG,
+    smoothing="boxcar",
+    smooth_size=DIR_SMOOTH_BINS,
+):
     """Firing rate (Hz) as a function of head direction, for one cluster.
 
     The directional analogue of :func:`~barrylab.analysis.maps.rate_map`:
@@ -109,14 +115,13 @@ def circular_mean(angles, weights=None, wrap="0_2pi"):
         Mean angle in radians, in the range selected by ``wrap``.
     """
     if wrap not in ("0_2pi", "-pi_pi"):
-        raise ValueError("wrap must be '0_2pi' or '-pi_pi', got %r" % (wrap,))
+        raise ValueError(f"wrap must be '0_2pi' or '-pi_pi', got {wrap!r}")
     angles = np.asarray(angles, dtype=float)
     w = np.ones_like(angles) if weights is None else np.asarray(weights, dtype=float)
     w = np.where(np.isnan(angles), np.nan, w)
     angles = np.where(np.isnan(w), np.nan, angles)
     sum_w = np.nansum(w)
-    mean = np.arctan2(np.nansum(np.sin(angles) * w) / sum_w,
-                      np.nansum(np.cos(angles) * w) / sum_w)
+    mean = np.arctan2(np.nansum(np.sin(angles) * w) / sum_w, np.nansum(np.cos(angles) * w) / sum_w)
     if wrap == "0_2pi":
         return np.mod(mean, 2 * np.pi)
     return np.mod(mean + np.pi, 2 * np.pi) - np.pi
@@ -151,8 +156,9 @@ def _kldiv(p1, p2, mode=None):
     p2 = np.asarray(p2, dtype=float)
     if mode == "js":
         q = (p1 + p2) / 2
-        return 0.5 * (np.sum(p1 * (np.log2(p1) - np.log2(q)))
-                      + np.sum(p2 * (np.log2(p2) - np.log2(q))))
+        return 0.5 * (
+            np.sum(p1 * (np.log2(p1) - np.log2(q))) + np.sum(p2 * (np.log2(p2) - np.log2(q)))
+        )
     if mode == "sym":
         kl1 = np.sum(p1 * (np.log2(p1) - np.log2(p2)))
         kl2 = np.sum(p2 * (np.log2(p2) - np.log2(p1)))
@@ -266,7 +272,7 @@ def led2v1_dir_offset(led2_dir_deg, led1_dir_deg):
     edges = np.concatenate([bin_centres - 0.5, [bin_centres[-1] + 0.5]])
     counts, _ = np.histogram(valid, bins=edges)
     smoothed = np.convolve(np.tile(counts, 3), np.ones(7) / 7.0, mode="same")
-    smoothed = smoothed[len(counts): 2 * len(counts)]  # circular smoothing via tiling
+    smoothed = smoothed[len(counts) : 2 * len(counts)]  # circular smoothing via tiling
     peak_offset = float(bin_centres[np.argmax(smoothed)])
     return float(mean_offset), peak_offset
 

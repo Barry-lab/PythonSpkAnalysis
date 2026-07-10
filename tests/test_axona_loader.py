@@ -60,7 +60,7 @@ def test_rate_map_smoothing_options(example_trial):
     import barrylab as bl
 
     rec = bl.load_dacq(example_trial)
-    box = bl.rate_map(rec, 2, 3)                                   # default boxcar-5
+    box = bl.rate_map(rec, 2, 3)  # default boxcar-5
     gauss = bl.rate_map(rec, 2, 3, smoothing="gaussian", smooth_size=2)
     raw = bl.rate_map(rec, 2, 3, smoothing=None)
 

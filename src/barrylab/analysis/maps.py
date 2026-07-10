@@ -74,8 +74,9 @@ def spike_map(recording, pos_index, bin_cm=RATEMAP_BIN_CM):
     return _histnd_2d(spike_xy, recording.window_extent, bin_px)
 
 
-def smooth_ratemap(bin_pos, bin_spk, kern_size=RATEMAP_SMOOTH_BINS,
-                   kern_type="boxcar", smooth_type="norm"):
+def smooth_ratemap(
+    bin_pos, bin_spk, kern_size=RATEMAP_SMOOTH_BINS, kern_type="boxcar", smooth_type="norm"
+):
     """Smooth binned dwell + spikes into a rate map. Port of ``make_smooth_ratemap.m``.
 
     Occupancy and spike maps are smoothed independently with edge normalisation
@@ -114,7 +115,7 @@ def smooth_ratemap(bin_pos, bin_spk, kern_size=RATEMAP_SMOOTH_BINS,
         # MATLAB's full-map fspecial('gaussian', ...) for any usable sigma.
         smooth = lambda a: gaussian_filter(a, sigma=kern_size, mode=mode, cval=0.0)  # noqa: E731
     else:
-        raise ValueError("kern_type must be 'boxcar' or 'gaussian', got %r" % (kern_type,))
+        raise ValueError(f"kern_type must be 'boxcar' or 'gaussian', got {kern_type!r}")
 
     visited = (bin_pos != 0).astype(float)
     denom = smooth(visited)
@@ -130,8 +131,9 @@ def smooth_ratemap(bin_pos, bin_spk, kern_size=RATEMAP_SMOOTH_BINS,
     return rate, smooth_pos, smooth_spk
 
 
-def rate_map(recording, electrode, cluster, bin_cm=RATEMAP_BIN_CM,
-             smoothing="boxcar", smooth_size=None):
+def rate_map(
+    recording, electrode, cluster, bin_cm=RATEMAP_BIN_CM, smoothing="boxcar", smooth_size=None
+):
     """Firing-rate map (Hz) for one cluster.
 
     With the defaults this reproduces ``easy_make_ratemap.m`` (a 5-bin boxcar).

@@ -116,8 +116,16 @@ def test_instant_freq_power_on_real_lfp(example_trial):
 # --- detect_ripples -----------------------------------------------------------
 
 
-def _inject_bursts(fs, duration, burst_times, burst_dur=0.15, burst_freq=200.0,
-                    burst_amp=5e-5, noise_amp=1e-6, seed=1):
+def _inject_bursts(
+    fs,
+    duration,
+    burst_times,
+    burst_dur=0.15,
+    burst_freq=200.0,
+    burst_amp=5e-5,
+    noise_amp=1e-6,
+    seed=1,
+):
     n = int(fs * duration)
     t = np.arange(n) / fs
     rng = np.random.RandomState(seed)

@@ -13,7 +13,7 @@ def _extract_pmat(event):
     bins2use = np.intersect1d(nan_ind, zero_ind)
     if bins2use.size == 0:
         return None
-    pmat = event[:, bins2use.min():bins2use.max() + 1].copy()
+    pmat = event[:, bins2use.min() : bins2use.max() + 1].copy()
     pmat[np.isnan(pmat)] = 0.0
     return pmat
 

@@ -49,7 +49,7 @@ def _fspecial_gaussian_square(hsize, sigma):
     siz = (hsize - 1) / 2.0
     coords = np.arange(hsize, dtype=float) - siz
     xx, yy = np.meshgrid(coords, coords)
-    h = np.exp(-(xx ** 2 + yy ** 2) / (2.0 * sigma ** 2))
+    h = np.exp(-(xx**2 + yy**2) / (2.0 * sigma**2))
     h[h < np.finfo(float).eps * h.max()] = 0.0
     total = h.sum()
     if total != 0:
@@ -67,7 +67,7 @@ def _as_random_state(rng):
 # fftVars.m -- the common parameter struct
 # --------------------------------------------------------------------------
 @dataclass
-class FFTParams(object):
+class FFTParams:
     """Parameters shared by the 2-D FFT grid-analysis family. Port of ``fftVars.m``.
 
     Kept as a plain dataclass of defaults (matching ``fftVars.m``'s role as a
@@ -174,7 +174,7 @@ def power_spectrum_2d(rate_map_2d, fft_size, smth_sig=0.0, max_rad=0):
         # Even-N centre after fftshift is at 0-based index N//2 -- matches
         # MATLAB's 1-based `floor(fftSize/2)+1` exactly (one less, 0-based).
         centre = int(fft_size) // 2
-        yy, xx = np.mgrid[0:int(fft_size), 0:int(fft_size)]
+        yy, xx = np.mgrid[0 : int(fft_size), 0 : int(fft_size)]
         dist = np.hypot(xx - centre, yy - centre)
         ps2d = np.where(dist > max_rad, np.nan, ps2d)
 
@@ -225,14 +225,18 @@ def _smooth_polar_fft(ps_pol, r_sig, th_sig):
     r_off = np.arange(kern_size_r) - kern_size_r // 2
     th_off = np.arange(kern_size_th) - kern_size_th // 2
     xx, yy = np.meshgrid(r_off, th_off)  # xx: radius offset (cols); yy: angle offset (rows)
-    kern = np.exp(-((xx ** 2) / (2.0 * r_sig ** 2) + (yy ** 2) / (2.0 * th_sig ** 2)))
+    kern = np.exp(-((xx**2) / (2.0 * r_sig**2) + (yy**2) / (2.0 * th_sig**2)))
 
     # Pad the radius axis (columns) with NaN on the low-r ("pre") side only --
     # wide enough (kern_size_r + 1, one more than the kernel's own half-width
     # margin) that the kernel can never wrap from one real edge to the other.
     pad_width = kern_size_r + 1
-    padded = np.pad(np.asarray(ps_pol, dtype=float), ((0, 0), (pad_width, 0)),
-                     mode="constant", constant_values=np.nan)
+    padded = np.pad(
+        np.asarray(ps_pol, dtype=float),
+        ((0, 0), (pad_width, 0)),
+        mode="constant",
+        constant_values=np.nan,
+    )
     norm = (~np.isnan(padded)).astype(float)
     padded = np.where(np.isnan(padded), 0.0, padded)
 
@@ -308,7 +312,9 @@ def to_polar_fft(ps2d, max_rad, th_bin=1.0, r_bin=1.0, sigma=None):
     """
     ps2d = np.asarray(ps2d)
     if ps2d.ndim != 2 or ps2d.shape[0] != ps2d.shape[1]:
-        raise ValueError("to_polar_fft expects a square 2-D power spectrum, got shape %r" % (ps2d.shape,))
+        raise ValueError(
+            f"to_polar_fft expects a square 2-D power spectrum, got shape {ps2d.shape!r}"
+        )
     fft_size = ps2d.shape[0]
     cent = fft_size // 2  # 0-based centre -- matches power_spectrum_2d's fftshift convention
 
@@ -319,9 +325,7 @@ def to_polar_fft(ps2d, max_rad, th_bin=1.0, r_bin=1.0, sigma=None):
             # hard-error here; Python's negative-index wraparound would
             # instead silently return wrong data -- raise explicitly (new
             # code's own robustness concern, not a MATLAB-fidelity issue).
-            raise ValueError(
-                "max_rad (%d) exceeds the array's half-size (%d)" % (max_rad, cent)
-            )
+            raise ValueError("max_rad (%d) exceeds the array's half-size (%d)" % (max_rad, cent))
         x = np.arange(-max_rad, max_rad + 1)
         y = np.arange(-max_rad, 1)
     else:
@@ -359,7 +363,7 @@ def to_polar_fft(ps2d, max_rad, th_bin=1.0, r_bin=1.0, sigma=None):
     hit = counts > 0
     ps_pol[hit] = sums[hit] / counts[hit]  # NaN propagates through hit bins too (see docstring)
     ps_pol = ps_pol.reshape(n_th_bins, n_r_bins)
-    ps_pol = ps_pol[:, :max_rad + 1]  # unconditional crop -- see the warning above
+    ps_pol = ps_pol[:, : max_rad + 1]  # unconditional crop -- see the warning above
 
     th_out = np.arange(n_th_bins) * th_bin
     # frq labels the max_rad+1 retained columns; exact for r_bin=1 (the only
@@ -472,13 +476,17 @@ def grid_fft_components(recording, electrode, cluster, params=None, n_shuffles=N
 
     bin_occ = occupancy_map(recording, params.bin_size_cm)
     bin_spk = spike_map(recording, spk_idx, params.bin_size_cm)
-    rm, _, _ = smooth_ratemap(bin_occ, bin_spk, 1, "boxcar")  # kern_size=1 -> unsmoothed, NaN-marked
+    rm, _, _ = smooth_ratemap(
+        bin_occ, bin_spk, 1, "boxcar"
+    )  # kern_size=1 -> unsmoothed, NaN-marked
 
     th_sig_bins = params.th_sig / params.th_bin  # smoothing sigma: degrees -> angular bins
     r_sig_bins = params.r_sig / params.r_bin  # smoothing sigma: FFT components -> radial bins
 
     ps2d = power_spectrum_2d(rm, params.fft_size, params.smth_2d_sig, max_rad)
-    ps_pol, th, _ = to_polar_fft(ps2d, max_rad, params.th_bin, params.r_bin, (r_sig_bins, th_sig_bins))
+    ps_pol, th, _ = to_polar_fft(
+        ps2d, max_rad, params.th_bin, params.r_bin, (r_sig_bins, th_sig_bins)
+    )
 
     min_rot_samp = int(round(params.min_shuf_s * recording.pos_sample_rate))
     rot_low, rot_high = min_rot_samp, n_pos - min_rot_samp

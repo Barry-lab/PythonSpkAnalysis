@@ -21,13 +21,20 @@ def _gaussian_kernel_1d(width_hz, sigma_hz, freq_res_hz):
     kernel_length = max(1, int(round(width_hz / freq_res_hz)) + 1)
     sigma_bins = kernel_length * (sigma_hz / width_hz)
     x = np.arange(kernel_length) - (kernel_length - 1) / 2.0
-    h = np.exp(-(x ** 2) / (2 * sigma_bins ** 2))
+    h = np.exp(-(x**2) / (2 * sigma_bins**2))
     h[h < np.finfo(float).eps * h.max()] = 0.0
     return h / h.sum()
 
 
-def power_spectrum(eeg, pos2use=None, smooth_kern=(2.0, 0.5), theta_range=(6.0, 12.0),
-                   upper_freq=25.0, s2n_width=1.0, eeg_freq=250.0):
+def power_spectrum(
+    eeg,
+    pos2use=None,
+    smooth_kern=(2.0, 0.5),
+    theta_range=(6.0, 12.0),
+    upper_freq=25.0,
+    s2n_width=1.0,
+    eeg_freq=250.0,
+):
     """FFT power spectrum of an LFP trace, with theta peak and signal-to-noise.
 
     Port of ``eeg_power_spectra.m``.
@@ -86,8 +93,13 @@ def power_spectrum(eeg, pos2use=None, smooth_kern=(2.0, 0.5), theta_range=(6.0, 
     min_freq_band = freqs >= 2.0  # lowerFrq, hardcoded in the original
     s2n = float(np.nanmean(power[peak_band]) / np.nanmean(power[~peak_band & min_freq_band]))
 
-    return {"power": power, "freqs": freqs, "max_power": max_power,
-            "max_freq": max_freq, "s2n": s2n}
+    return {
+        "power": power,
+        "freqs": freqs,
+        "max_power": max_power,
+        "max_freq": max_freq,
+        "s2n": s2n,
+    }
 
 
 def instant_freq_power(eeg, filter_range, eeg_freq=250.0, pos_sample_rate=50.0):
@@ -191,8 +203,7 @@ def instant_freq_power(eeg, filter_range, eeg_freq=250.0, pos_sample_rate=50.0):
     # taps). scipy.signal.firwin's default frequency-normalisation (fs=) and
     # scaling (scale=True, matching fir1's default) reproduce this design.
     numtaps = int(round(eeg_freq)) + 1
-    fir_coeffs = firwin(numtaps, filter_range, window="blackman",
-                         pass_zero=False, fs=eeg_freq)
+    fir_coeffs = firwin(numtaps, filter_range, window="blackman", pass_zero=False, fs=eeg_freq)
     filt_eeg = filtfilt(fir_coeffs, [1.0], eeg)
     analytic = hilbert(filt_eeg)
 
@@ -205,8 +216,9 @@ def instant_freq_power(eeg, filter_range, eeg_freq=250.0, pos_sample_rate=50.0):
     perc_low_amp = 100.0 * np.count_nonzero(low_amp) / len(amp)
     if perc_low_amp > 10.0:
         warnings.warn(
-            ">10%% (%.2g%%) of EEG points have v. low amplitude - set to nan."
-            % perc_low_amp)
+            f">10% ({perc_low_amp:.2g}%) of EEG points have v. low amplitude - set to nan.",
+            stacklevel=2,
+        )
     phase = np.where(low_amp, np.nan, phase)
     amp = np.where(low_amp, np.nan, amp)
 
@@ -236,20 +248,25 @@ def instant_freq_power(eeg, filter_range, eeg_freq=250.0, pos_sample_rate=50.0):
         down_samp_const = eeg_freq / pos_sample_rate
         if not np.isclose(down_samp_const, round(down_samp_const)):
             raise ValueError(
-                "eeg_freq/pos_sample_rate (%.6f) is not an integer -- cannot "
-                "downsample to whole blocks." % down_samp_const)
+                f"eeg_freq/pos_sample_rate ({down_samp_const:.6f}) is not an integer -- cannot "
+                "downsample to whole blocks."
+            )
         down_samp_const = int(round(down_samp_const))
         n_blocks = n_samples // down_samp_const
         n_used = n_blocks * down_samp_const  # drop any trailing partial block
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)  # all-nan blocks
-            freq_pos_rate = np.nanmean(
-                freq[:n_used].reshape(n_blocks, down_samp_const), axis=1)
-            amp_pos_rate = np.nanmean(
-                amp[:n_used].reshape(n_blocks, down_samp_const), axis=1)
+            freq_pos_rate = np.nanmean(freq[:n_used].reshape(n_blocks, down_samp_const), axis=1)
+            amp_pos_rate = np.nanmean(amp[:n_used].reshape(n_blocks, down_samp_const), axis=1)
 
-    return {"filt_eeg": filt_eeg, "phase": phase, "amp": amp, "freq": freq,
-            "freq_pos_rate": freq_pos_rate, "amp_pos_rate": amp_pos_rate}
+    return {
+        "filt_eeg": filt_eeg,
+        "phase": phase,
+        "amp": amp,
+        "freq": freq,
+        "freq_pos_rate": freq_pos_rate,
+        "amp_pos_rate": amp_pos_rate,
+    }
 
 
 def detect_ripples(eeg, eeg_freq, rip_freq=(150.0, 250.0), rip_thresh=5.0):
@@ -344,7 +361,7 @@ def detect_ripples(eeg, eeg_freq, rip_freq=(150.0, 250.0), rip_thresh=5.0):
     amp = result["amp"]
     freq = result["freq"]
 
-    power = amp ** 2
+    power = amp**2
     power = np.where(np.isnan(power), 0.0, power)
 
     # Smooth with a ~half-ripple-width (0.05s) boxcar. filter2(kern, X) with a
@@ -372,16 +389,20 @@ def detect_ripples(eeg, eeg_freq, rip_freq=(150.0, 250.0), rip_thresh=5.0):
     if rip_str.size == 0 or rip_end.size == 0:
         # See docstring: MATLAB crashes here on an empty array; "no
         # candidate ripples anywhere" is a well-defined result instead.
-        return {"rip_ind": np.empty((0, 2), dtype=np.int64),
-                "power": power, "pk_power": np.empty(0),
-                "mean_freq": np.empty(0), "duration": np.empty(0)}
+        return {
+            "rip_ind": np.empty((0, 2), dtype=np.int64),
+            "power": power,
+            "pk_power": np.empty(0),
+            "mean_freq": np.empty(0),
+            "duration": np.empty(0),
+        }
 
     if rip_str[0] > rip_end[0]:
         # Trace starts already above the low threshold (an orphan "end"
         # with no matching "start" inside the trace) -- drop it.
         rip_end = rip_end[1:]
     # Drop any trailing, unterminated "start" -- see docstring note.
-    rip_str = rip_str[:len(rip_end)]
+    rip_str = rip_str[: len(rip_end)]
 
     duration = (rip_end - rip_str) / eeg_freq
     long_enough = duration > rip_min_dur
@@ -407,5 +428,10 @@ def detect_ripples(eeg, eeg_freq, rip_freq=(150.0, 250.0), rip_thresh=5.0):
     duration = (rip_end - rip_str) / eeg_freq
     rip_ind = np.column_stack([rip_str, rip_end]).astype(np.int64)
 
-    return {"rip_ind": rip_ind, "power": power, "pk_power": pk_power,
-            "mean_freq": mean_freq, "duration": duration}
+    return {
+        "rip_ind": rip_ind,
+        "power": power,
+        "pk_power": pk_power,
+        "mean_freq": mean_freq,
+        "duration": duration,
+    }

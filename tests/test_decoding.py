@@ -30,6 +30,7 @@ def test_bayesian_posterior_normalises_to_one():
 
 def test_bayesian_posterior_rejects_cell_mismatch():
     import pytest
+
     with pytest.raises(ValueError):
         bayesian_posterior(np.ones((2, 5)), np.ones((3, 3, 3)), t_bin=0.5)
 
@@ -52,6 +53,7 @@ def test_spike_counts_per_window_overlap_sums_correctly():
 
 def test_spike_counts_per_window_rejects_full_overlap():
     import pytest
+
     with pytest.raises(ValueError):
         spike_counts_per_window(np.array([0.0]), (0, 10), win_width=4, win_overlap=1.0)
 
@@ -79,7 +81,9 @@ def test_decode_recovers_position_from_clean_place_fields():
     rate_maps = np.zeros((ny, nx, n_cells))
     for c in range(n_cells):
         cy, cx = centres[c]
-        rate_maps[:, :, c] = 15.0 * np.exp(-((yy - cy) ** 2 + (xx - cx) ** 2) / (2 * sigma ** 2)) + 0.2
+        rate_maps[:, :, c] = (
+            15.0 * np.exp(-((yy - cy) ** 2 + (xx - cx) ** 2) / (2 * sigma**2)) + 0.2
+        )
 
     t_bin = 0.5
     n_windows = 150
@@ -96,7 +100,7 @@ def test_decode_recovers_position_from_clean_place_fields():
         dec_bins[w] = np.unravel_index(flat, (ny, nx), order="F")
 
     err_bins = np.sqrt(np.sum((dec_bins - true_bins) ** 2, axis=1))
-    chance_level = np.sqrt(ny ** 2 + nx ** 2) / 3  # rough chance-level scale
+    chance_level = np.sqrt(ny**2 + nx**2) / 3  # rough chance-level scale
     assert err_bins.mean() < chance_level / 2
 
 
@@ -115,6 +119,7 @@ def test_bayesian_posterior_with_prior_normalises_and_is_finite():
 def test_decode_maximum_likelihood_zero_error_when_post_matches_true_bin():
     """If the posterior is a clean delta at the animal's true bin, decode
     error should be ~0."""
+
     class _FakeRecording:
         pass
 

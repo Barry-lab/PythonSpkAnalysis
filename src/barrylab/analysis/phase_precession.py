@@ -35,8 +35,9 @@ def _kempter_corr(theta, t):
 
 def _lcc(x, t, max_slope, bounds_frac):
     lo, hi = bounds_frac[0] * max_slope, bounds_frac[1] * max_slope
-    result = minimize_scalar(_cost, args=(x, t), bounds=(lo, hi), method="bounded",
-                             options={"xatol": 1e-2})
+    result = minimize_scalar(
+        _cost, args=(x, t), bounds=(lo, hi), method="bounded", options={"xatol": 1e-2}
+    )
     slope_opt = result.x
     fval_opt = result.fun
     phase_opt = np.arctan2(np.sum(np.sin(t - slope_opt * x)), np.sum(np.cos(t - slope_opt * x)))
@@ -95,8 +96,13 @@ def circular_linear_regression(x, t, k=1000, pp_dir=0, random_state=None):
         raise ValueError("t must be in radians, in the range [0, 2*pi]")
 
     if len(x) < 3:
-        return {"slope_opt": np.nan, "phase_opt": np.nan, "fval_opt": np.nan,
-                "corr": np.nan, "psim": np.nan}
+        return {
+            "slope_opt": np.nan,
+            "phase_opt": np.nan,
+            "fval_opt": np.nan,
+            "corr": np.nan,
+            "psim": np.nan,
+        }
 
     if pp_dir == -1:
         bounds_frac = (-1.0, np.finfo(float).eps)
@@ -108,7 +114,11 @@ def circular_linear_regression(x, t, k=1000, pp_dir=0, random_state=None):
     max_slope = (4 * np.pi) / (x.max() - x.min())
     fit = _lcc(x, t, max_slope, bounds_frac)
 
-    rng = random_state if isinstance(random_state, np.random.RandomState) else np.random.RandomState(random_state)
+    rng = (
+        random_state
+        if isinstance(random_state, np.random.RandomState)
+        else np.random.RandomState(random_state)
+    )
     n = len(t)
     corr_dist = np.empty(k)
     for i in range(k):

@@ -3,7 +3,9 @@
 import numpy as np
 import pytest
 
-skimage = pytest.importorskip("skimage", reason="scikit-image not installed (barrylab[fieldshuffle])")
+skimage = pytest.importorskip(
+    "skimage", reason="scikit-image not installed (barrylab[fieldshuffle])"
+)
 
 from barrylab.analysis.field_shuffle import (  # noqa: E402
     _brandon_gridness,
@@ -44,8 +46,9 @@ def test_fix_watershed_no_ridge_bins_is_a_noop():
 
 def test_watershed_fields_produces_valid_labelling_on_synthetic_fields():
     yy, xx = np.mgrid[0:30, 0:30]
-    rm = (5.0 * np.exp(-((xx - 8) ** 2 + (yy - 8) ** 2) / 10)
-          + 5.0 * np.exp(-((xx - 22) ** 2 + (yy - 22) ** 2) / 10))
+    rm = 5.0 * np.exp(-((xx - 8) ** 2 + (yy - 8) ** 2) / 10) + 5.0 * np.exp(
+        -((xx - 22) ** 2 + (yy - 22) ** 2) / 10
+    )
     labels = watershed_fields(rm)
     assert labels.shape == rm.shape
     assert labels.min() >= 1  # no unresolved ridge bins on this clean synthetic case
@@ -63,7 +66,9 @@ def test_watershed_fields_respects_occupancy():
 
 def test_field_bin_locations_peaks_match_independent_check():
     yy, xx = np.mgrid[0:20, 0:20]
-    rm = 5.0 * np.exp(-((xx - 5) ** 2 + (yy - 5) ** 2) / 8) + 5.0 * np.exp(-((xx - 15) ** 2 + (yy - 15) ** 2) / 8)
+    rm = 5.0 * np.exp(-((xx - 5) ** 2 + (yy - 5) ** 2) / 8) + 5.0 * np.exp(
+        -((xx - 15) ** 2 + (yy - 15) ** 2) / 8
+    )
     labels = watershed_fields(rm)
     locs = field_bin_locations(labels, rm)
 
@@ -111,8 +116,9 @@ def test_watershed_fields_on_example_grid_cell(example_trial):
 # --------------------------------------------------------------------------
 def _two_field_setup(n=20):
     yy, xx = np.mgrid[0:n, 0:n]
-    rm = (5.0 * np.exp(-((xx - 5) ** 2 + (yy - 5) ** 2) / 6)
-          + 5.0 * np.exp(-((xx - 14) ** 2 + (yy - 14) ** 2) / 6))
+    rm = 5.0 * np.exp(-((xx - 5) ** 2 + (yy - 5) ** 2) / 6) + 5.0 * np.exp(
+        -((xx - 14) ** 2 + (yy - 14) ** 2) / 6
+    )
     labels = watershed_fields(rm)
     locs = field_bin_locations(labels, rm)
     static_bin = np.array([], dtype=np.int64)
@@ -154,14 +160,20 @@ def test_shuffle_fields_excludes_a_field_whose_peak_is_static():
     rm = np.zeros((1, 6))
     locs = [
         {  # a genuine field: peak=0, others=1,2
-            "label": 1, "peak_index": (0, 0), "n_other": 2,
+            "label": 1,
+            "peak_index": (0, 0),
+            "n_other": 2,
             "other_indices": [(0, 1), (0, 2)],
-            "theta": np.array([0.0, 0.0]), "radius": np.array([1.0, 2.0]),
+            "theta": np.array([0.0, 0.0]),
+            "radius": np.array([1.0, 2.0]),
         },
         {  # a degenerate "field" whose peak (bin 3) is itself unvisited
-            "label": 2, "peak_index": (0, 3), "n_other": 2,
+            "label": 2,
+            "peak_index": (0, 3),
+            "n_other": 2,
             "other_indices": [(0, 4), (0, 5)],
-            "theta": np.array([0.0, 0.0]), "radius": np.array([1.0, 2.0]),
+            "theta": np.array([0.0, 0.0]),
+            "radius": np.array([1.0, 2.0]),
         },
     ]
     static_bin = np.array([3], dtype=np.int64)  # exactly field 2's peak
@@ -288,7 +300,7 @@ def test_brandon_gridness_matches_best_of_both_methods():
         for i in range(-5, 6):
             for j in range(-5, 6):
                 c = i * a1 + j * a2 + centre
-                m += np.exp(-((xx - c[0]) ** 2 + (yy - c[1]) ** 2) / (2 * sigma ** 2))
+                m += np.exp(-((xx - c[0]) ** 2 + (yy - c[1]) ** 2) / (2 * sigma**2))
         return m
 
     sac = spatial_autocorrelogram(hex_grid_map())
@@ -327,7 +339,10 @@ def test_field_shuffle_significance_keep_ratemaps(example_trial):
     assert result["ratemaps"]["real"].ndim == 2
     assert len(result["ratemaps"]["temporal_shuffle"]) == 2
     assert len(result["ratemaps"]["field_shuffle"]) == 2
-    assert all(rm.shape == result["ratemaps"]["real"].shape for rm in result["ratemaps"]["temporal_shuffle"])
+    assert all(
+        rm.shape == result["ratemaps"]["real"].shape
+        for rm in result["ratemaps"]["temporal_shuffle"]
+    )
 
 
 def test_is_grid_cell_discriminates_example_cells(example_trial):

@@ -135,14 +135,16 @@ def field_bin_locations(labels, rate_map):
         theta = np.mod(np.arctan2(-off_r, off_c), 2 * np.pi)
         radius = np.hypot(off_c, off_r)
 
-        result.append({
-            "label": int(lbl),
-            "peak_index": (peak_r, peak_c),
-            "other_indices": list(zip(other_r.tolist(), other_c.tolist())),
-            "theta": theta,
-            "radius": radius,
-            "n_other": len(other_flat),
-        })
+        result.append(
+            {
+                "label": int(lbl),
+                "peak_index": (peak_r, peak_c),
+                "other_indices": list(zip(other_r.tolist(), other_c.tolist())),
+                "theta": theta,
+                "radius": radius,
+                "n_other": len(other_flat),
+            }
+        )
     return result
 
 
@@ -359,9 +361,18 @@ def _brandon_gridness(sac):
     return float(np.fmax(std1, std2)), float(np.fmax(exp1, exp2))
 
 
-def field_shuffle_significance(recording, electrode, cluster, bin_cm=2.0, n_shuffles=100,
-                                smooth_kern_size=1.5, smooth_kern_type="gaussian",
-                                min_temporal_rotation_s=30.0, keep_ratemaps=False, rng=None):
+def field_shuffle_significance(
+    recording,
+    electrode,
+    cluster,
+    bin_cm=2.0,
+    n_shuffles=100,
+    smooth_kern_size=1.5,
+    smooth_kern_type="gaussian",
+    min_temporal_rotation_s=30.0,
+    keep_ratemaps=False,
+    rng=None,
+):
     """Gridness of a cell vs. its own temporal- and field-shuffle distributions.
 
     A ``Recording``-level redesign of ``fs_masterAnalysis.m`` (like
@@ -476,7 +487,9 @@ def field_shuffle_significance(recording, electrode, cluster, bin_cm=2.0, n_shuf
         rot_amount = rng.randint(rot_low, rot_high + 1)
         rot_spk_idx = (spk_idx + rot_amount) % n_pos
         bin_spk_rot = spike_map(recording, rot_spk_idx, bin_cm)
-        rm_t, _, _ = smooth_ratemap(bin_occ, bin_spk_rot, smooth_kern_size, smooth_kern_type, "norm")
+        rm_t, _, _ = smooth_ratemap(
+            bin_occ, bin_spk_rot, smooth_kern_size, smooth_kern_type, "norm"
+        )
         if keep_ratemaps:
             time_rms.append(rm_t)
         sac_t = spatial_autocorrelogram(rm_t)
@@ -488,7 +501,9 @@ def field_shuffle_significance(recording, electrode, cluster, bin_cm=2.0, n_shuf
         flat = shuf_inds.ravel()
         bin_occ_shuf = bin_occ.ravel()[flat].reshape(rm.shape)
         bin_spk_shuf = bin_spk.ravel()[flat].reshape(rm.shape)
-        rm_s, _, _ = smooth_ratemap(bin_occ_shuf, bin_spk_shuf, smooth_kern_size, smooth_kern_type, "norm")
+        rm_s, _, _ = smooth_ratemap(
+            bin_occ_shuf, bin_spk_shuf, smooth_kern_size, smooth_kern_type, "norm"
+        )
         if keep_ratemaps:
             space_rms.append(rm_s)
         sac_s = spatial_autocorrelogram(rm_s)

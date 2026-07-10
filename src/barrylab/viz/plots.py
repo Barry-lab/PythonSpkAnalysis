@@ -55,5 +55,5 @@ def image_rm(rm, cmap=None, ax=None):
     ax.set_axis_off()
 
     peak_rate = np.nan if unvisited.all() else np.nanmax(rm)
-    ax.set_title("%.1fHz" % peak_rate)
+    ax.set_title(f"{peak_rate:.1f}Hz")
     return im

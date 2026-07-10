@@ -9,10 +9,11 @@ Point ``BARRYLAB_EXAMPLE_DATA`` at the ``Example_data`` directory to enable them
 
 import os
 
-import pytest
-
 # Ensure the src/ layout is importable without an editable install.
 import sys
+
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 _CANDIDATES = [

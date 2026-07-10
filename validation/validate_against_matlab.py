@@ -33,9 +33,9 @@ import scipy.io as sio
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "src"))
 
-from barrylab.io.axona import _read_pos, load_dacq  # noqa: E402
 from barrylab.analysis.maps import occupancy_map, rate_map, spike_map  # noqa: E402
 from barrylab.analysis.spatial import spatial_information  # noqa: E402
+from barrylab.io.axona import _read_pos, load_dacq  # noqa: E402
 
 REPO = "/Users/caswell/Documents/Git/Universal_Matlab"
 EX = os.path.join(REPO, "Read_Bin_Data", "Example_data")
@@ -77,9 +77,9 @@ def main():
     rec = load_dacq(TRIAL, head_pos_weighting="midpoint")
     d_xy, d_sp = nanmaxabs(rec.xy, g_pos.xy), nanmaxabs(rec.speed, g_pos.speed)
     dd = float(np.nanmax(np.abs(np.mod(rec.direction - g_pos.dir + 180, 360) - 180)))
-    check("xy", d_xy < EXACT, "max|d|=%.2e px" % d_xy)
-    check("direction", dd < EXACT, "max|d|=%.2e deg" % dd)
-    check("speed", d_sp < EXACT, "max|d|=%.2e cm/s" % d_sp)
+    check("xy", d_xy < EXACT, f"max|d|={d_xy:.2e} px")
+    check("direction", dd < EXACT, f"max|d|={dd:.2e} deg")
+    check("speed", d_sp < EXACT, f"max|d|={d_sp:.2e} cm/s")
 
     print("\n=== Stage 3: spike timing -> pos_sample (bit-exact) ===")
     elec = rec.electrode(TET)
@@ -87,32 +87,40 @@ def main():
 
     print("\n=== Stage 4: cut file + spike selection (bit-exact) ===")
     check("exactCut", np.array_equal(elec.clusters, m["exactCut"]))
-    check("spikePosSamp (t2c3)",
-          np.array_equal(elec.spike_pos_index(CLUSTER) + 1, m["spikePosSamp"]))
+    check(
+        "spikePosSamp (t2c3)", np.array_equal(elec.spike_pos_index(CLUSTER) + 1, m["spikePosSamp"])
+    )
 
     print("\n=== Stage 5: spatial binning (bit-exact, brute-force cross-check) ===")
     occ = occupancy_map(rec)
     spk = spike_map(rec, elec.spike_pos_index(CLUSTER))
-    check("occupancy total == duration", abs(occ.sum() - rec.duration) < 1e-6,
-          "%.4f s" % occ.sum())
-    check("spike total == n spikes", spk.sum() == elec.spike_pos_index(CLUSTER).size,
-          "%d spikes" % int(spk.sum()))
+    check("occupancy total == duration", abs(occ.sum() - rec.duration) < 1e-6, f"{occ.sum():.4f} s")
+    check(
+        "spike total == n spikes",
+        spk.sum() == elec.spike_pos_index(CLUSTER).size,
+        "%d spikes" % int(spk.sum()),
+    )
     check("binning == brute force", _binning_matches_brute(rec, occ, spk, elec))
 
     print("\n=== Stage 5b: smoothed rate map vs stale fixture (sanity, NOT bit-exact) ===")
     rm = rate_map(rec, TET, CLUSTER)
     gold_rm = m["smthRm"]
-    check("rate map shape + NaN pattern",
-          rm.shape == gold_rm.shape and np.array_equal(np.isnan(rm), np.isnan(gold_rm)))
+    check(
+        "rate map shape + NaN pattern",
+        rm.shape == gold_rm.shape and np.array_equal(np.isnan(rm), np.isnan(gold_rm)),
+    )
     both = ~np.isnan(rm) & ~np.isnan(gold_rm)
     corr = float(np.corrcoef(rm[both], gold_rm[both])[0, 1])
-    note("current boxcar vs fixture", "r=%.4f (fixture used a precursor smoother)" % corr)
-    check("rate map correlated (sanity)", corr > 0.9, "r=%.4f" % corr)
+    note("current boxcar vs fixture", f"r={corr:.4f} (fixture used a precursor smoother)")
+    check("rate map correlated (sanity)", corr > 0.9, f"r={corr:.4f}")
 
     print("\n=== Stage 6: spatial information (sanity) ===")
     bps, bpsec = spatial_information(rm, occ)
-    check("spatial info finite & positive", np.isfinite(bps) and bps > 0,
-          "%.4f bits/spike, %.4f bits/s" % (bps, bpsec))
+    check(
+        "spatial info finite & positive",
+        np.isfinite(bps) and bps > 0,
+        f"{bps:.4f} bits/spike, {bpsec:.4f} bits/s",
+    )
 
     print("\n" + "=" * 60)
     n = sum(results)
@@ -126,8 +134,12 @@ def _binning_matches_brute(rec, occ, spk, elec):
     nby, nbx = int(np.ceil(yext / bs)), int(np.ceil(xext / bs))
 
     def brute(points):
-        yb = np.clip(np.ceil(np.where(points[:, 1] == 0, 1e-12, points[:, 1]) / bs).astype(int), 1, nby)
-        xb = np.clip(np.ceil(np.where(points[:, 0] == 0, 1e-12, points[:, 0]) / bs).astype(int), 1, nbx)
+        yb = np.clip(
+            np.ceil(np.where(points[:, 1] == 0, 1e-12, points[:, 1]) / bs).astype(int), 1, nby
+        )
+        xb = np.clip(
+            np.ceil(np.where(points[:, 0] == 0, 1e-12, points[:, 0]) / bs).astype(int), 1, nbx
+        )
         out = np.zeros((nby, nbx))
         np.add.at(out, (yb - 1, xb - 1), 1.0)
         return out

@@ -5,8 +5,8 @@ import numpy as np
 from barrylab.analysis.grid import (
     _regional_minima_1d,
     fast_gridness,
-    gridness,
     grid_properties,
+    gridness,
     spatial_autocorrelogram,
     square_grid_props,
 )
@@ -22,7 +22,7 @@ def _hex_grid_map(n=61, spacing=12.0, sigma=2.5):
     for i in range(-5, 6):
         for j in range(-5, 6):
             c = i * a1 + j * a2 + centre
-            m += np.exp(-((xx - c[0]) ** 2 + (yy - c[1]) ** 2) / (2 * sigma ** 2))
+            m += np.exp(-((xx - c[0]) ** 2 + (yy - c[1]) ** 2) / (2 * sigma**2))
     return m
 
 
@@ -70,7 +70,7 @@ def test_grid_properties_of_hex_grid():
 def test_gridness_of_blob_is_not_high():
     # a single field has no hexagonal structure
     yy, xx = np.mgrid[0:41, 0:41]
-    blob = np.exp(-((xx - 20) ** 2 + (yy - 20) ** 2) / (2 * 5.0 ** 2))
+    blob = np.exp(-((xx - 20) ** 2 + (yy - 20) ** 2) / (2 * 5.0**2))
     standard, _ = gridness(spatial_autocorrelogram(blob))
     assert not (standard > 0.5)  # nan or low, but never grid-like
 
@@ -92,15 +92,27 @@ def test_gridness_discriminates_example_grid_cells(example_trial):
 # confirmed algorithmic divergences this is validating around, not against.
 # --------------------------------------------------------------------------
 def test_regional_minima_1d():
-    assert _regional_minima_1d([5, 4, 3, 2, 3, 4, 5]).tolist() == \
-        [False, False, False, True, False, False, False]
-    assert _regional_minima_1d([5, 4, 2, 2, 2, 4, 5]).tolist() == \
-        [False, False, True, True, True, False, False]
-    assert _regional_minima_1d([5, 4, 3, 2, 1]).tolist() == \
-        [False, False, False, False, True]
+    assert _regional_minima_1d([5, 4, 3, 2, 3, 4, 5]).tolist() == [
+        False,
+        False,
+        False,
+        True,
+        False,
+        False,
+        False,
+    ]
+    assert _regional_minima_1d([5, 4, 2, 2, 2, 4, 5]).tolist() == [
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        False,
+    ]
+    assert _regional_minima_1d([5, 4, 3, 2, 1]).tolist() == [False, False, False, False, True]
     assert _regional_minima_1d([3, 3, 3, 3]).tolist() == [True, True, True, True]
-    assert _regional_minima_1d([5, 1, 5, 0, 5]).tolist() == \
-        [False, True, False, True, False]
+    assert _regional_minima_1d([5, 1, 5, 0, 5]).tolist() == [False, True, False, True, False]
 
 
 def test_fast_gridness_of_synthetic_hex_grid_is_high():
@@ -113,7 +125,7 @@ def test_fast_gridness_of_synthetic_hex_grid_is_high():
 
 def test_fast_gridness_of_blob_is_not_high():
     yy, xx = np.mgrid[0:41, 0:41]
-    blob = np.exp(-((xx - 20) ** 2 + (yy - 20) ** 2) / (2 * 5.0 ** 2))
+    blob = np.exp(-((xx - 20) ** 2 + (yy - 20) ** 2) / (2 * 5.0**2))
     standard, _, _ = fast_gridness(spatial_autocorrelogram(blob))
     assert not (standard > 0.5)
 
@@ -165,7 +177,7 @@ def _square_grid_map(n=61, spacing=12.0, sigma=2.5):
     for i in range(-5, 6):
         for j in range(-5, 6):
             c = i * a1 + j * a2 + centre
-            m += np.exp(-((xx - c[0]) ** 2 + (yy - c[1]) ** 2) / (2 * sigma ** 2))
+            m += np.exp(-((xx - c[0]) ** 2 + (yy - c[1]) ** 2) / (2 * sigma**2))
     return m
 
 
@@ -195,7 +207,7 @@ def test_square_grid_props_of_blob_scores_much_lower_than_square_grid():
     # positive score. The meaningful, non-brittle check is that it scores
     # far below a genuine square grid's clean, strongly positive score.
     yy, xx = np.mgrid[0:41, 0:41]
-    blob = np.exp(-((xx - 20) ** 2 + (yy - 20) ** 2) / (2 * 5.0 ** 2))
+    blob = np.exp(-((xx - 20) ** 2 + (yy - 20) ** 2) / (2 * 5.0**2))
     blob_gridness = square_grid_props(spatial_autocorrelogram(blob))["gridness"]
     square_gridness = square_grid_props(spatial_autocorrelogram(_square_grid_map()))["gridness"]
     assert blob_gridness < 0.5 * square_gridness

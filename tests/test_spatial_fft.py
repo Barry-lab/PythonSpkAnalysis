@@ -47,7 +47,7 @@ def test_fspecial_gaussian_square_even_hsize_matches_matlab_half_integer_grid():
     assert np.isclose(kern.sum(), 1.0)
     coords = np.arange(4) - 1.5
     xx, yy = np.meshgrid(coords, coords)
-    expected = np.exp(-(xx ** 2 + yy ** 2) / 2.0)
+    expected = np.exp(-(xx**2 + yy**2) / 2.0)
     expected = expected / expected.sum()
     assert np.allclose(kern, expected)
 
@@ -319,16 +319,30 @@ def _synthetic_grating_recording(wavelength_cm=24.0, amplitude=5.0, theta_deg=60
     pos_times = np.arange(n_pos) / pos_sample_rate
     window = (0.0, n_side * bin_px, 0.0, n_side * bin_px)
     rec = Recording(
-        name="synthetic_grating", xy=pos_xy, direction=np.zeros(n_pos), speed=np.zeros(n_pos),
-        pos_times=pos_times, pos_sample_rate=pos_sample_rate, pixels_per_metre=ppm, window=window,
-        electrodes={1: Electrode(1, spike_times=pos_times[spk_idx], pos_index=spk_idx,
-                                  clusters=np.zeros(len(spk_idx), dtype=int))},
+        name="synthetic_grating",
+        xy=pos_xy,
+        direction=np.zeros(n_pos),
+        speed=np.zeros(n_pos),
+        pos_times=pos_times,
+        pos_sample_rate=pos_sample_rate,
+        pixels_per_metre=ppm,
+        window=window,
+        electrodes={
+            1: Electrode(
+                1,
+                spike_times=pos_times[spk_idx],
+                pos_index=spk_idx,
+                clusters=np.zeros(len(spk_idx), dtype=int),
+            )
+        },
     )
     return rec, bin_cm
 
 
 def test_grid_fft_components_recovers_known_grating_angle_and_wavelength():
-    rec, bin_cm = _synthetic_grating_recording(wavelength_cm=24.0, amplitude=5.0, theta_deg=60.0, seed=0)
+    rec, bin_cm = _synthetic_grating_recording(
+        wavelength_cm=24.0, amplitude=5.0, theta_deg=60.0, seed=0
+    )
     params = FFTParams()
     params.bin_size_cm = bin_cm
     params.fft_size = 64  # small for test speed; n_shuffles small per porting-brief convention

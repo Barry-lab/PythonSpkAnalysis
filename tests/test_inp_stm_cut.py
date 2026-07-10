@@ -153,7 +153,7 @@ def test_write_cut_embeds_actual_file_stem_not_hardcoded_literal(tmp_path):
     1500728a' regardless of the fileStem argument. This port must not."""
     assignment = np.array([0, 1, 0, 1])
     path = write_cut(assignment, str(tmp_path), "a_totally_different_stem", 5)
-    with open(path, "r") as fh:
+    with open(path) as fh:
         text = fh.read()
     assert "Exact_cut_for: a_totally_different_stem" in text
     assert "1500728a" not in text
@@ -162,7 +162,7 @@ def test_write_cut_embeds_actual_file_stem_not_hardcoded_literal(tmp_path):
 def test_write_cut_header_declares_n_clusters_and_reserves_cluster_0(tmp_path):
     assignment = np.array([0, 2, 2, 5, 0])
     path = write_cut(assignment, str(tmp_path), "stem", 1)
-    with open(path, "r") as fh:
+    with open(path) as fh:
         text = fh.read()
     assert "n_clusters: 6" in text  # clusters 0..5 declared (max id 5 + 1)
     assert " cluster:  0 centre:" in text

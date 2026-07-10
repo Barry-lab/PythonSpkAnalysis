@@ -39,7 +39,7 @@ def led_swap_filter(led_pos, led_pix, thresh=5.0):
 
     def dist(a, b):
         diff = led_pos[cur, a, :] - led_pos[prev, b, :]
-        return np.sqrt(np.nansum(diff ** 2, axis=1))
+        return np.sqrt(np.nansum(diff**2, axis=1))
 
     dist12, dist11 = dist(0, 1), dist(0, 0)
     dist21, dist22 = dist(1, 0), dist(1, 1)
@@ -63,7 +63,7 @@ def led_speed_filter(led_pos, max_pix_per_sample, led):
     ok = np.where(~np.isnan(led_pos[:, led, 0]))[0]
     if len(ok) < 2:
         return
-    max_sq = max_pix_per_sample ** 2
+    max_sq = max_pix_per_sample**2
     prev = ok[0]
     for idx in range(1, len(ok)):
         pos = ok[idx]
@@ -91,8 +91,15 @@ def _interp_nans(led_pos, led):
         led_pos[missing, led, k] = np.interp(idx[missing], idx[ok], led_pos[ok, led, k])
 
 
-def postprocess_pos_data(led_pos, led_pix, pos_header, set_header,
-                         max_speed=2.0, box_car=0.4, head_pos_weighting="tracking"):
+def postprocess_pos_data(
+    led_pos,
+    led_pix,
+    pos_header,
+    set_header,
+    max_speed=2.0,
+    box_car=0.4,
+    head_pos_weighting="tracking",
+):
     """Clean raw LED positions into xy / direction / speed.
 
     Parameters

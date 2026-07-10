@@ -36,14 +36,15 @@ def test_circular_mean_wrap_convention_same_angle_different_range():
     angles = [np.radians(-5), np.radians(5), np.radians(-3)]
     m_pos = circular_mean(angles, wrap="0_2pi")
     m_signed = circular_mean(angles, wrap="-pi_pi")
-    assert m_pos > np.radians(300)          # wrapped up near 2*pi
-    assert -np.radians(10) < m_signed < 0   # stayed small and negative
+    assert m_pos > np.radians(300)  # wrapped up near 2*pi
+    assert -np.radians(10) < m_signed < 0  # stayed small and negative
     # same physical angle on the circle either way
     assert np.isclose(np.mod(m_pos, 2 * np.pi), np.mod(m_signed, 2 * np.pi))
 
 
 def test_circular_mean_rejects_bad_wrap():
     import pytest
+
     with pytest.raises(ValueError):
         circular_mean([0.0, 1.0], wrap="bogus")
 
@@ -81,9 +82,9 @@ def test_directional_fft_detects_six_cycle():
     dir_rate = 5.0 + np.cos(6 * theta)  # a pure 6-cycle (hexadirectional) signal
     power, freqs, rel_freq, rel_power = directional_fft(dir_rate)
     assert len(power) == 181 and len(freqs) == 181
-    assert np.isclose(power[0], 0.0, atol=1e-6)   # DC removed
-    assert np.argmax(power) == 6                  # 6-cycle component dominates
-    assert np.max(rel_power) < 0.01               # 2,3,4,5,7 cycles negligible
+    assert np.isclose(power[0], 0.0, atol=1e-6)  # DC removed
+    assert np.argmax(power) == 6  # 6-cycle component dominates
+    assert np.max(rel_power) < 0.01  # 2,3,4,5,7 cycles negligible
 
 
 def test_head_direction_map_on_example(example_trial):

@@ -212,7 +212,7 @@ def reget_line_band(pmat_shape, spd, y_interc, y_range):
     kern_len = 2 * y_range + 1
     ln_bnd = convolve1d(ln_bnd, np.ones(kern_len), axis=0, mode="constant", cval=0.0)
 
-    return ln_bnd[n_rows: 2 * n_rows, :]
+    return ln_bnd[n_rows : 2 * n_rows, :]
 
 
 def line_residual(pmat, line_band):

@@ -11,8 +11,6 @@ consume. Typical use::
     bits_per_spike, _ = bl.spatial_information(rmap, bl.occupancy_map(rec))
 """
 
-from .core.recording import Electrode, Recording
-from .io.axona import load_dacq, read_inp, read_stm, write_cut
 from .analysis._stats import nan_corr
 from .analysis.decoding import (
     bayesian_posterior,
@@ -50,6 +48,8 @@ from .analysis.place_fields import field_stats, spatial_coherence, spatial_corre
 from .analysis.pxd import place_by_direction, pxd
 from .analysis.spatial import adaptive_binning, spatial_information, true_ppm_bounding_box
 from .analysis.spatial_fft import FFTParams, grid_fft_components, power_spectrum_2d, to_polar_fft
+from .core.recording import Electrode, Recording
+from .io.axona import load_dacq, read_inp, read_stm, write_cut
 
 __version__ = "0.1.0"
 

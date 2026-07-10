@@ -10,7 +10,7 @@ Ported from the MATLAB ``read_binary_data.m``, ``find_word.m`` and
 it is easy to audit against the originals.
 """
 
-from typing import List, Optional, Tuple
+from typing import Optional
 
 import numpy as np
 
@@ -19,7 +19,7 @@ _DATA_END = b"data_end"
 
 # A parsed header: an ordered list of (key, value) string pairs, mirroring the
 # 2-column cell array the MATLAB toolbox passes around.
-Header = List[Tuple[str, str]]
+Header = list[tuple[str, str]]
 
 
 def _parse_header_text(text: str) -> Header:
@@ -39,7 +39,7 @@ def _parse_header_text(text: str) -> Header:
     return header
 
 
-def read_axona_file(path: str, has_binary: bool) -> Tuple[Header, Optional[bytes]]:
+def read_axona_file(path: str, has_binary: bool) -> tuple[Header, Optional[bytes]]:
     """Read an Axona file, returning its header and (optional) binary payload.
 
     Parameters
@@ -64,7 +64,7 @@ def read_axona_file(path: str, has_binary: bool) -> Tuple[Header, Optional[bytes
 
     i0 = raw.find(_DATA_START)
     if i0 < 0:
-        raise ValueError("could not find data_start marker in %s" % path)
+        raise ValueError(f"could not find data_start marker in {path}")
     header = _parse_header_text(raw[:i0].decode("latin-1"))
 
     # Binary begins immediately after the 10-character 'data_start' token and
