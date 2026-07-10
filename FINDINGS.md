@@ -541,7 +541,76 @@ zero out NaNs before use, matching how the MATLAB script's own next line
 (`pMat(isnan(pMat))=0`) handles it, so this is a non-issue, just worth noting
 for anyone assuming `bins2use` selects a fully-valid contiguous block.
 
-## 14. Things confirmed correct and bit-exact
+## 14. `fs_fastGridness.m` -> `fast_gridness`, v0.5 — five confirmed divergences from `multiGridness.m`
+
+Ported `fs_fastGridness.m` into `grid.py::fast_gridness`. It only has one real
+caller (`fs_masterAnalysis.m`, itself not yet ported — the FieldShuffle
+significance-testing orchestration), but the porting plan groups it with v0.5
+as a standalone, independently-validatable analysis function, and its own
+header comment describes it as "a cut down version of autocorr props" — i.e.
+a second, faster implementation of the *same measurement* already ported as
+`gridness`/`grid_properties` (`multiGridness.m`/`sacProps.m`).
+
+**It is not numerically interchangeable with `gridness`/`grid_properties`,
+even on the identical SAC.** Reading both MATLAB sources side by side turned
+up five confirmed algorithmic divergences (not assumed — each checked by
+re-reading both `.m` files):
+
+1. Peak detection: `fs_fastGridness.m` calls `imregionalmax(sac)` directly
+   (`sac` already has NaN substituted to -1). `multiGridness.m` first masks
+   non-positive bins to -1 (`tmp(sac<=0)=-1`) *before* calling
+   `imregionalmax`. So `fs_fastGridness.m` can in principle pick up spurious
+   "peaks" among negative-valued or NaN-substituted SAC regions that
+   `multiGridness.m` deliberately excludes.
+2. Candidate peak list: `fs_fastGridness.m` builds it straight from
+   `find(peaksSAC)` -- one candidate per *pixel* of any local-max plateau.
+   `multiGridness.m` goes through `bwlabel`+`regionprops` first -- one
+   candidate per *connected plateau* (its centroid). A multi-pixel plateau
+   is therefore one peak to `multiGridness.m` and several to
+   `fs_fastGridness.m`.
+3. Every radius/mask comparison in `fs_fastGridness.m` uses a
+   distance-from-centre grid **rounded** to the nearest integer bin
+   (`dstFrmCentre=round(dstFrmCentre)`, needed for its precomputed
+   `allMsks` disc-mask family). `multiGridness.m`'s equivalent
+   (`centreRadi`) is left continuous throughout. Boundary pixels of a
+   radius-thresholded mask can therefore differ by one ring between the two.
+4. Grid scale: `fs_fastGridness.m`'s `gScl` is the **mean** distance to the
+   closest ~6 peaks (`mean(dstFrmCent(2:end))`). `grid_properties`'s
+   `scale` is the **median** (`sacProps.m`'s `median(...)`).
+5. Expanding gridness picks a different central/inner radius entirely.
+   `multiGridness.m` (Killian 2012 style, already in `gridness`) uses half
+   the mean peak distance (`round(mean(peakDist)/2)`).
+   `fs_fastGridness.m` (Langston et al. 2011 style) instead computes a
+   *radial mean-correlation profile* (mean SAC value at each integer radius)
+   and takes the first regional minimum or first negative crossing of that
+   profile as the inner radius, falling back to a hard-coded 5 bins if
+   neither exists.
+
+Also confirmed while porting (not a divergence from `multiGridness.m`, but
+worth noting): the half-height field-extent sub-step (`sf_findPeakExtent`)
+*is* byte-for-byte identical between the two files, so `fast_gridness` reuses
+the already-validated `_peak_fields`/`_rotational_gridness` helpers built for
+`gridness` for that piece and for the final rotated-correlation step —
+genuine shared code, not an assumption of equivalence. One subtlety this
+reuse required getting right: `_peak_fields` resolves *overlapping*
+half-height fields by keeping the numerically larger field-label id, and
+MATLAB assigns those ids as the peaks' *original* (pre-distance-sort)
+`find()`-order positions, not a fresh 1..7 relabelling by distance — using
+sequential ids instead would silently change which field wins an overlap.
+
+**Validation.** No MATLAB runtime available (same constraint as §13), so no
+bit-exact comparison against real MATLAB output. Used: (a) the existing
+synthetic hexagonal-lattice fixture (from `test_grid.py`) — `fast_gridness`
+scores it high on both standard and expanding gridness, same as `gridness`;
+(b) a single-Gaussian-blob non-grid fixture — scores low/NaN on both, same
+qualitative call as `gridness`; (c) a real validated grid cell
+(`gridCell1838_t2c3`) — `fast_gridness` and `gridness`/`grid_properties`
+agree to within ~0.05 gridness and ~0.4 bins of scale, both correctly call it
+a strong grid cell. Given the five confirmed divergences above, exact
+agreement was never expected; the ballpark cross-check is there to catch a
+port bug that would make the two wildly disagree, not to assert equivalence.
+
+## 15. Things confirmed correct and bit-exact
 
 `.pos`/tetrode/`.cut` binary readers (big-endian, 216-byte spikes, 20-byte pos
 records); LED swap + speed filtering; NaN interpolation; 20-tap boxcar position

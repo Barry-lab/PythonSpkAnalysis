@@ -32,6 +32,7 @@ from .analysis.direction import (
     resultant_vector,
 )
 from .analysis.grid import (
+    fast_gridness,
     grid_properties,
     grid_score,
     gridness,
@@ -63,6 +64,7 @@ __all__ = [
     "gridness",
     "grid_properties",
     "grid_score",
+    "fast_gridness",
     "head_direction_map",
     "head_direction_stats",
     "directional_occupancy",

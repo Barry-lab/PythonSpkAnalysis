@@ -10,6 +10,12 @@ Ports the lab's grid-cell canon from ``Universal_Matlab/Analysis_Grid`` (and
 - :func:`grid_properties` — grid scale, orientation, peak coordinates and mean
   peak r (``sacProps.m``).
 - :func:`grid_score` — convenience: rate map -> SAC -> standard gridness.
+- :func:`fast_gridness` — a leaner, DISTINCT standard/expanding-gridness
+  implementation used inside the (not yet ported) FieldShuffle significance
+  loop (``fs_fastGridness.m``, Langston et al. 2011). Not a duplicate of
+  :func:`gridness`/:func:`grid_properties` — see its docstring for several
+  confirmed algorithmic divergences from ``multiGridness.m``, faithfully
+  preserved rather than reconciled.
 
 The MATLAB image-processing calls (``imregionalmax``, ``bwlabel``,
 ``regionprops``, ``imrotate``) are reproduced with ``scipy.ndimage`` so no
@@ -272,3 +278,169 @@ def grid_score(recording, electrode, cluster, bin_cm=2.0, smoothing="boxcar",
     sac = spatial_autocorrelogram(rm, min_overlap=min_overlap)
     props = grid_properties(sac)
     return props["gridness"], props["scale"] * bin_cm
+
+
+# --------------------------------------------------------------------------
+# Fast gridness for the FieldShuffle loop (fs_fastGridness.m)
+# --------------------------------------------------------------------------
+def _regional_minima_1d(x):
+    """Positions of ``imregionalmin()``-style regional minima in a 1-D array.
+
+    A regional minimum is a maximal flat run strictly lower than the values
+    immediately bordering it on both sides (an array edge only needs the one
+    existing neighbour to be higher).
+    """
+    x = np.asarray(x, dtype=float)
+    n = x.size
+    is_min = np.zeros(n, dtype=bool)
+    i = 0
+    while i < n:
+        j = i
+        while j + 1 < n and x[j + 1] == x[i]:
+            j += 1
+        left_ok = (i == 0) or (x[i - 1] > x[i])
+        right_ok = (j == n - 1) or (x[j + 1] > x[j])
+        if left_ok and right_ok:
+            is_min[i:j + 1] = True
+        i = j + 1
+    return is_min
+
+
+def fast_gridness(sac):
+    """Fast standard + expanding (Langston 2011) gridness, and grid scale.
+
+    Port of ``fs_fastGridness.m`` — used inside the (not yet ported)
+    FieldShuffle significance-testing loop, where it is called many times per
+    cell and so trades a little precision for speed relative to
+    :func:`gridness`/:func:`grid_properties`.
+
+    .. warning::
+       Despite the similar name and purpose, this is **not** numerically
+       identical to :func:`gridness`/:func:`grid_properties`, even for
+       standard gridness on the same SAC. Confirmed, faithfully-preserved
+       divergences from ``multiGridness.m`` (see ``FINDINGS.md``):
+
+       1. Peak detection here does not restrict ``imregionalmax`` to
+          positive-valued SAC bins the way ``multiGridness.m`` does (it masks
+          non-positive bins to -1 first) — so spurious peaks among negative
+          or NaN-substituted (-1) SAC regions can in principle be picked up.
+       2. It builds the candidate peak list directly from ``find()`` on the
+          regional-max mask -- one candidate per *pixel* of any local-max
+          plateau -- rather than ``bwlabel``+``regionprops`` centroids (one
+          candidate per connected plateau).
+       3. All radius/mask comparisons here use a distance-from-centre grid
+          **rounded** to the nearest integer bin (needed for its precomputed
+          disc-mask family); ``multiGridness.m`` keeps this distance
+          continuous throughout.
+       4. Grid scale is the **mean** distance to the closest ~6 peaks;
+          :func:`grid_properties` uses the **median**.
+       5. Expanding gridness here picks its central/inner radius from the
+          SAC's own radial mean-correlation profile (first regional minimum
+          or first negative crossing, Langston et al. 2011) rather than half
+          the mean peak distance (Killian 2012, used by :func:`gridness`).
+
+    Parameters
+    ----------
+    sac : ndarray
+        A spatial autocorrelogram (from :func:`spatial_autocorrelogram`).
+
+    Returns
+    -------
+    (std_g, exp_g, grid_scale)
+        ``std_g``/``exp_g`` — standard / expanding gridness (``nan`` if fewer
+        than 2 peaks are found). ``grid_scale`` — mean distance (in SAC bins)
+        to the closest peaks, excluding the centre (``nan`` if none).
+    """
+    exp_g_min, exp_g_step, exp_g_max = 5, 1, 5
+
+    sac = np.real(np.asarray(sac, dtype=float))
+    filled = np.where(np.isnan(sac), -1.0, sac)
+    n_rows, n_cols = filled.shape
+
+    is_max = filled == maximum_filter(filled, size=3, mode="nearest")
+    # find(peaksSAC) traverses in MATLAB's column-major order; tie-break order
+    # matters for which pixels land in the "closest 7" below.
+    flat_idx = np.flatnonzero(is_max.ravel(order="F"))
+    ys, xs = np.unravel_index(flat_idx, is_max.shape, order="F")
+    if ys.size < 2:
+        return float("nan"), float("nan"), float("nan")
+
+    central_row = int(np.ceil(n_rows / 2.0))  # 1-based
+    central_col = int(np.ceil(n_cols / 2.0))
+    dx = (xs + 1.0) - central_col
+    dy = (ys + 1.0) - central_row
+    dist = np.sqrt(dx ** 2 + dy ** 2)
+
+    order = np.argsort(dist, kind="stable")
+    n_take = min(7, order.size)
+    closest = order[:n_take]
+    dist_from_cent = dist[closest]
+    grid_scale = float(np.mean(dist_from_cent[1:])) if n_take > 1 else float("nan")
+
+    peak_rc = np.column_stack([ys[closest], xs[closest]])  # 0-based (row, col)
+    # Field label ids are the peaks' ORIGINAL (pre-distance-sort) find()-order
+    # positions -- matching MATLAB's `closestPeaks` values exactly, not a
+    # fresh 1..7 relabelling -- because _peak_fields resolves overlapping
+    # half-height fields by keeping the numerically larger id, and that
+    # tie-break must match MATLAB's (effectively arbitrary) id assignment.
+    label_ids = closest + 1
+    field = _peak_fields(filled, {"label_ids": label_ids, "peak_rc": peak_rc})
+
+    # Rounded (integer-bin) distance-from-centre grid, used for every
+    # radius/mask comparison below -- see divergence (3) in the docstring.
+    yy, xx = np.mgrid[1:n_rows + 1, 1:n_cols + 1]
+    dist_grid = np.floor(np.sqrt((xx - central_col) ** 2 + (yy - central_row) ** 2) + 0.5)
+    half_min_sz = int(np.min(np.floor(np.array([n_rows, n_cols]) / 2.0)))
+
+    # --- Standard gridness -------------------------------------------------
+    field_mask = field != 0
+    max_dist = dist_grid[field_mask].max() if field_mask.any() else 0.0
+    max_dist = min(max_dist, half_min_sz)
+    std_mask = (dist_grid <= max_dist) & (field != label_ids[0])
+    std_g = _rotational_gridness(filled, std_mask)
+
+    # --- Expanding (Langston 2011) gridness ---------------------------------
+    # Radial mean-correlation profile: mean SAC value at each integer radius.
+    radii = dist_grid[dist_grid > 0].astype(np.int64)
+    vals = filled[dist_grid > 0]
+    max_r = int(radii.max()) if radii.size else 0
+    corr_vs_rad = np.zeros(max_r)
+    if max_r:
+        sums = np.bincount(radii - 1, weights=vals, minlength=max_r)
+        counts = np.bincount(radii - 1, minlength=max_r)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            corr_vs_rad = np.where(counts > 0, sums / np.where(counts > 0, counts, 1), 0.0)
+    corr_vs_rad = np.where(np.isnan(corr_vs_rad), 0.0, corr_vs_rad)
+
+    rad_of_cent = None
+    if corr_vs_rad.size:
+        candidates = []
+        min_idx = np.flatnonzero(_regional_minima_1d(corr_vs_rad))
+        if min_idx.size:
+            candidates.append(min_idx[0] + 1)  # 1-based radius
+        neg_idx = np.flatnonzero(corr_vs_rad < 0)
+        if neg_idx.size:
+            candidates.append(neg_idx[0] + 1)
+        if candidates:
+            rad_of_cent = min(candidates)
+
+    def _candidate_radii(r0):
+        return np.arange(r0 + exp_g_min, half_min_sz - exp_g_max + 1, exp_g_step)
+
+    mask_ext_rad = _candidate_radii(rad_of_cent) if rad_of_cent is not None else np.array([])
+    if mask_ext_rad.size == 0:
+        rad_of_cent = 5
+        mask_ext_rad = _candidate_radii(rad_of_cent)
+
+    exp_g = float("nan")
+    if mask_ext_rad.size:
+        exp_gs = []
+        for r in mask_ext_rad:
+            annulus = (dist_grid <= r) & (dist_grid > rad_of_cent)
+            g = _rotational_gridness(filled, annulus)
+            if np.isfinite(g):
+                exp_gs.append(g)
+        if exp_gs:
+            exp_g = max(exp_gs)
+
+    return std_g, exp_g, grid_scale

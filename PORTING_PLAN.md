@@ -62,11 +62,13 @@ and `circ_regress_cb` (phase-precession circular–linear regression — infra-f
 oracle). No infra; grouped because it is the biggest concentration of column-major/1-based index risk
 and shares validation discipline.
 
-**v0.5 — Grid extras: elliptical correction (DONE), 2D-FFT, cross-SAC, expanding gridness.**
-`gridEllipse_fit`, `regularise_elliptic_sac` (single copy), `xSacProps`, the 2D-FFT subpackage
-(`fftVars`, `get_2d_fft`, `get_polar_fft`, `main_spatial_fft2`), and `fs_fastGridness`
-(expanding/Langston gridness). Niche siblings (`brandonRegEcc`, `sacProps90deg`) only if elliptical /
-square-grid analysis is wanted. No infra, **but** confirm the ported SAC supports cross-correlation
+**v0.5 — Grid extras: elliptical correction (DONE), fast/Langston gridness (DONE), 2D-FFT, cross-SAC.**
+`gridEllipse_fit`, `regularise_elliptic_sac` (single copy) DONE. `fs_fastGridness`
+(expanding/Langston gridness) DONE — `grid.py::fast_gridness`, a confirmed-non-bit-comparable sibling
+of `gridness`/`grid_properties` (see its docstring + `FINDINGS.md`). Still to do: `xSacProps`, the 2D-FFT
+subpackage (`fftVars`, `get_2d_fft`, `get_polar_fft`, `main_spatial_fft2`). Niche siblings
+(`brandonRegEcc`, `sacProps90deg`) only if elliptical / square-grid analysis is wanted. No infra,
+**but** confirm the ported SAC supports cross-correlation
 mode (needed by `xSacProps`).
 
 **v0.6 — NEW INFRA: EEG/EGF loading (v0.6a DONE) → then LFP/theta analysis (v0.6b PARTIAL: power_spectrum DONE; eeg_instant_freq_power/detect_ripples deferred).**
@@ -153,7 +155,7 @@ vector (docstring says mean — averaging line is commented out); preserve, expo
 | `get_polar_fft` | `spatial_fft.py::to_polar_fft` | A | no | GF | useful (subpkg core) |
 | `main_spatial_fft2` | `spatial_fft.py::grid_fft_components` | R | no | GF (deterministic parts) + seeded shuffle | useful |
 | `main_spatial_fft` (v1) | — | — | — | — | **skip (superseded by v2)** |
-| `fs_fastGridness` | `grid.py::expanding_gridness` | A | no | GF | useful (if expanding gridness not already in grid_score) |
+| `fs_fastGridness` | `grid.py::fast_gridness` | A | no | SYN (hex-grid + real grid-cell ballpark cross-check vs `gridness`/`grid_properties`, see `FINDINGS.md`) | **DONE** |
 | `fs_fixWatershed` | `analysis/field_shuffle.py::fix_watershed` | A | **watershed** | STRUCT | useful (gated) |
 | `fs_binMembLoc` | `field_shuffle.py::bin_member_loc` | A | no | GF | useful (gated w/ shuffle) |
 | `fs_shufFields` | `field_shuffle.py::shuffle_fields` | A | **watershed** | seeded | useful (the novel algo) |
