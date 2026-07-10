@@ -20,6 +20,12 @@ RATEMAP_SMOOTH_BINS = 5
 #: Default Gaussian smoothing sigma in bins (used when smoothing="gaussian").
 RATEMAP_GAUSS_SIGMA = 2.0
 
+# --- Head direction (default_vars.m: rm.binSizeDir / rm.smthKernDir) ------
+#: Directional bin width in degrees (6 -> 60 bins around the circle).
+DIR_BIN_DEG = 360.0 / 60.0
+#: Default circular boxcar smoothing width in bins for tuning curves.
+DIR_SMOOTH_BINS = 5
+
 # --- Adaptive binning (skaggsAdaptiveBinning.m) --------------------------
 #: Alpha used by Skaggs adaptive smoothing prior to spatial information.
 ADAPTIVE_SMOOTH_ALPHA = 200.0

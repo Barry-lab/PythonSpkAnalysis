@@ -34,7 +34,10 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `multiGridness.m` | `gridness(sac)` → `(standard, expanding)` | public |
 | `sacProps.m` | `grid_properties(sac)` | public — scale/orientation/peaks |
 | `Analysis_Grid` (ellipse fit, 2-D FFT, field shuffle) | — | **not yet ported** (roadmap v0.2+) |
-| `Analysis_Dir` (head direction) | — | **not yet ported** (roadmap v0.2) |
+| `cb_circMean.m` | `circular_mean(angles, weights)` | public — circular mean |
+| `dir_kldiv.m` / `kldiv.m` | `directionality(tuning_curve)` | public — directionality index |
+| `circ_FTT.m` | `directional_fft(tuning_curve)` | public — multimodal/hexadirectional |
+| (HD tuning curve) | `head_direction_map` / `head_direction_stats` | public — bins by direction |
 | `Analysis_Freq` (theta/LFP/phase) | — | **not yet ported** (roadmap v0.4+) |
 | `Decoding` (Bayesian) | — | **not yet ported** (roadmap v0.4+) |
 | spatial coherence/correlation | — | **not yet ported** |

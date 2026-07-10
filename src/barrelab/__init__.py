@@ -13,6 +13,15 @@ consume. Typical use::
 
 from .core.recording import Electrode, Recording
 from .io.axona import load_dacq
+from .analysis.direction import (
+    circular_mean,
+    directional_fft,
+    directional_occupancy,
+    directionality,
+    head_direction_map,
+    head_direction_stats,
+    resultant_vector,
+)
 from .analysis.grid import (
     grid_properties,
     grid_score,
@@ -38,4 +47,11 @@ __all__ = [
     "gridness",
     "grid_properties",
     "grid_score",
+    "head_direction_map",
+    "head_direction_stats",
+    "directional_occupancy",
+    "circular_mean",
+    "resultant_vector",
+    "directionality",
+    "directional_fft",
 ]

@@ -99,7 +99,7 @@ with [`validation/generate_fixtures.m`](validation/generate_fixtures.m).
 ## Roadmap
 
 - **v0.1** — DACQ loader, `Recording`, rate maps, Skaggs info, MATLAB validation harness.
-- **v0.2 (in progress)** — spatial autocorrelogram + gridness ✓; head-direction tuning, border/speed scores, plotting next.
+- **v0.2 (in progress)** — spatial autocorrelogram + gridness ✓, head-direction tuning ✓; border/speed scores, place-field stats, plotting next.
 - **v0.3** — Neuropixels front end (SpikeGLX + Open Ephys via SpikeInterface + Kilosort4).
 - **v0.4 → v1.0** — LFP/theta/phase precession, Bayesian decoding, NWB export, plugin loader API.
 
