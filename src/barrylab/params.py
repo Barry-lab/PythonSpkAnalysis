@@ -30,5 +30,22 @@ DIR_SMOOTH_BINS = 5
 #: Alpha used by Skaggs adaptive smoothing prior to spatial information.
 ADAPTIVE_SMOOTH_ALPHA = 200.0
 
+# --- Place x direction ML model (pxd.m / wrapper_pxd.m) ------------------
+#: Spatial bin size in cm for the pxd 3-D histogram. Coarser than RATEMAP_BIN_CM
+#: because pxd.m's own docstring warns spatial bin count should stay <= ~30x30
+#: (too many spatial bins destabilises the joint place/direction ML fit).
+PXD_POS_BIN_CM = 4.0
+#: Boxcar smoothing width in bins for the pxd positional (place) marginal.
+PXD_POS_SMOOTH_BINS = 5
+#: Circular boxcar smoothing width in bins for the pxd directional marginal.
+PXD_DIR_SMOOTH_BINS = 3
+#: Max EM-style iterations before giving up (pxd.m default).
+PXD_MAX_ITER = 1000
+#: Fractional log-likelihood change to declare convergence (pxd.m default).
+PXD_ACCURACY = 1e-6
+#: Floor for expected firing rate/denominators to avoid log(0)/divide-by-zero
+#: (pxd.m default).
+PXD_TOL = 0.1
+
 #: Value DACQ writes into the position stream for an untracked LED.
 UNTRACKED_LED_FLAG = 1023

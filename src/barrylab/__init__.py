@@ -32,6 +32,7 @@ from .analysis.grid import (
 )
 from .analysis.maps import occupancy_map, rate_map, smooth_ratemap, spike_map
 from .analysis.place_fields import field_stats, spatial_coherence, spatial_correlation
+from .analysis.pxd import place_by_direction, pxd
 from .analysis.spatial import adaptive_binning, spatial_information, true_ppm_bounding_box
 
 __version__ = "0.1.0"
@@ -63,4 +64,6 @@ __all__ = [
     "spatial_coherence",
     "spatial_correlation",
     "nan_corr",
+    "pxd",
+    "place_by_direction",
 ]

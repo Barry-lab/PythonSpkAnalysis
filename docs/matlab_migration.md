@@ -39,6 +39,9 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `circ_FTT.m` | `directional_fft(tuning_curve)` | public — multimodal/hexadirectional |
 | `led2v1_dir_offset.m` | `led2v1_dir_offset(led2_dir, led1_dir)` | public — 2-LED/1-LED heading bias |
 | (HD tuning curve) | `head_direction_map` / `head_direction_stats` | public — bins by direction |
+| `pxd.m` | `pxd(spikes, times)` | public — place x direction ML fit |
+| `wrapper_pxd.m` | `place_by_direction(recording, electrode, cluster)` | public — bins + fits + smooths |
+| `histnd.m` (general N-D case) | `_binning.histnd(data, ranges, bin_size)` | internal — used by `pxd` |
 | `pcFieldStats.m` | `field_stats(rate_map, min_field_bins, min_rate)` | public — place-field size/rate |
 | `spatialCoherance.m` | `spatial_coherence(rate_map)` | public — smoothness/signal quality |
 | `spatialCorrelation.m` | `spatial_correlation(rm1, rm2, stack_maps=True)` | public — remapping/stability |

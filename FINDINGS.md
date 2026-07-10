@@ -126,7 +126,45 @@ scale comes out at 40 cm. To lock these bit-exact, `validation/generate_fixtures
 now also dumps `sac`, `gridness_std/exp`, `grid_scale/orientation/mean_r` from the
 current MATLAB; add a regression test asserting `np.allclose` once a fixture exists.
 
-## 6. Things confirmed correct and bit-exact
+## 6. Place x direction ML model (pxd), v0.3
+
+Ported `pxd.m` (the alternating-maximum-likelihood factorial fit) and
+`wrapper_pxd.m` (raw-data binning + smoothing wrapper) as `analysis/pxd.py`.
+Also added a fresh general N-D `histnd` (`analysis/_binning.py`) since this is
+the first analysis needing true 3-D (direction x posY x posX) binning — cross-
+checked against the existing validated 2-D binning inside `maps.py` and found
+**exactly identical** (max diff 0.0), so the new implementation is trustworthy.
+
+**A real bug in `wrapper_pxd.m`, faithfully reproduced.** The spatial bin range
+is built as `[max(y), max(y)]` instead of `[max(y), max(x)]` — a copy-paste
+error (the corresponding *min*-value row correctly uses `min(y)` then
+`min(x)`). For a non-square tracked window this mis-scales the X extent used
+for binning. Per goal 1, replicated exactly (see `place_by_direction()`'s
+docstring) rather than silently fixed.
+
+**Smoothing derivation worth recording.** `wrapper_pxd.m` smooths its two
+output marginals with ad hoc inline code (edge-corrected boxcar for the
+position map, plain circular boxcar for direction) rather than calling the
+already-existing `make_smooth_ratemap.m`. Worked out that both are exactly
+expressible as calls to our already-ported `smooth_ratemap()`: pass the
+binary visited-mask as `bin_pos` and `p * visited_mask` as `bin_spk` and
+`smooth_ratemap`'s own edge-correction reduces to precisely the same
+edge-corrected mean the wrapper computes by hand (the self-normalising ratio
+`smooth(visited)/smooth(visited) = 1` cancels out the "rate" division,
+leaving just the edge-corrected smooth of `p`). Confirmed this algebraically
+before implementing — reuses validated code instead of duplicating the
+smoothing logic a second time.
+
+**Validation.** Structural + cross-consistency, no golden fixture available
+for this one: the recovered place map correlates r=0.94 with the
+already-validated plain rate map for the same cell (r1838 t2c3); the
+recovered direction map correlates r=0.85 with the already-validated plain
+head-direction tuning curve. Also a synthetic test with known ground-truth
+place x direction factors, recovered with r>0.8/0.7 respectively by the ML
+fit, plus an exact check of the model's own normalisation invariant (total
+predicted spikes matches actual, per marginal).
+
+## 7. Things confirmed correct and bit-exact
 
 `.pos`/tetrode/`.cut` binary readers (big-endian, 216-byte spikes, 20-byte pos
 records); LED swap + speed filtering; NaN interpolation; 20-tap boxcar position

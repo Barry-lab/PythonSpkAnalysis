@@ -49,10 +49,9 @@ metrics (`pcFieldStats`, `spatialCoherance`, `spatialCorrelation`, `get_true_PPM
 infra; all deterministic and fixture-able; `spatialCorrelation` (remapping/stability) is a headline
 analysis. Ships the small shared bits everything else reuses.
 
-**v0.3 — Head-direction & place×direction.**
+**v0.3 — Head-direction & place×direction. STATUS: DONE.**
 `circular_mean`, `directional_kldiv` (+ KL via scipy), `directional_fft`, `led2v1_dir_offset`, and the
-`pxd`/`histnd`/`wrapper_pxd` unit. Depends only on a `dir_rate_map` builder + direction binning from
-v0.2. No infra.
+`pxd`/`histnd`/`wrapper_pxd` unit are all shipped in `analysis/direction.py` and `analysis/pxd.py`.
 
 **v0.4 — Population decoding, replay & circular–linear regression.**
 Bayesian decoder trio (`decode_calcPost`, `decode_getSpkCnt`, `decode_processPost`),
