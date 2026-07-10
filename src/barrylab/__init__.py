@@ -41,7 +41,7 @@ from .analysis.grid import (
 )
 from .analysis.grid_ellipse import brandon_regularise, fit_grid_ellipse, regularise_elliptic_sac
 from .analysis.grid_phase import cross_sac_props
-from .analysis.lfp import power_spectrum
+from .analysis.lfp import detect_ripples, instant_freq_power, power_spectrum
 from .analysis.line_trajectory import best_line, line_residual, reget_line_band
 from .analysis.maps import occupancy_map, rate_map, smooth_ratemap, spike_map
 from .analysis.phase_precession import circular_linear_regression
@@ -93,6 +93,8 @@ __all__ = [
     "regularise_elliptic_sac",
     "brandon_regularise",
     "power_spectrum",
+    "instant_freq_power",
+    "detect_ripples",
     "best_line",
     "reget_line_band",
     "line_residual",

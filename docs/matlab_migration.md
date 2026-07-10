@@ -67,7 +67,8 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `eeg_convert_to_volts.m` | `io.axona.eeg_convert_to_volts(samples, channel, settings, kind)` | public — counts to volts |
 | (LFP loading) | `load_dacq(..., load_lfp=True)` -> `Recording.lfp` | public — unlocks theta/LFP analysis |
 | `eeg_power_spectra.m` | `power_spectrum(eeg, pos2use, ...)` | public — FFT power spectrum, theta peak/s2n |
-| `eeg_instant_freq_power.m`, `detect_ripples.m` | — | **not yet ported** (`PORTING_PLAN.md` v0.6b, deferred) |
+| `eeg_instant_freq_power.m` | `instant_freq_power(eeg, filter_range, eeg_freq, pos_sample_rate)` | public — bandpass + Hilbert instantaneous phase/amp/freq |
+| `detect_ripples.m` | `detect_ripples(eeg, eeg_freq, rip_freq, rip_thresh)` | public — ripple/SWR detection; **default `rip_thresh` is 5, matching the MATLAB code (its own docstring wrongly claims 4 — see `FINDINGS.md`)** |
 | `fs_masterAnalysis.m` watershed step + `fs_fixWatershed.m` | `field_shuffle.watershed_fields(rate_map, occupancy)` | public — needs `barrylab[fieldshuffle]` |
 | `fs_binMembLoc.m` | `field_shuffle.field_bin_locations(labels, rate_map)` | public — needs `barrylab[fieldshuffle]` |
 | `fs_shufFields.m` | `field_shuffle.shuffle_fields(shape, field_bin_loc, static_bin, rng=...)` | public — involves genuine randomness, see docstring/`FINDINGS.md` |

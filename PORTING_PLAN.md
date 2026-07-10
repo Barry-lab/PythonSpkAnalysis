@@ -76,11 +76,14 @@ regular hex grids — see `FINDINGS.md`). Still to do: the 2D-FFT subpackage (`f
 `get_polar_fft`, `main_spatial_fft2`) — the largest remaining v0.5 piece (a 1000-iteration shuffle
 significance test). Niche `sacProps90deg` only if square-grid analysis is wanted.
 
-**v0.6 — NEW INFRA: EEG/EGF loading (v0.6a DONE) → then LFP/theta analysis (v0.6b PARTIAL: power_spectrum DONE; eeg_instant_freq_power/detect_ripples deferred).**
+**v0.6 — NEW INFRA: EEG/EGF loading (v0.6a DONE) → then LFP/theta analysis (v0.6b DONE).**
 *v0.6a (infra):* add `.eeg` (int8, 250 Hz) and `.egf` (int16, 4.8 kHz) reading to the DACQ loader, an
 `lfp` field on Recording, and `eeg_convert_to_volts`. *v0.6b (analysis, after 6a):*
-`eeg_instant_freq_power`, `eeg_power_spectra`, `detect_ripples` (ripples require `.egf`). This is the
-only phase blocked on new infra; everything above is independent of it.
+`eeg_instant_freq_power`, `eeg_power_spectra`, `detect_ripples` (ripples require `.egf`) — all three now
+ported (`analysis/lfp.py::instant_freq_power/power_spectrum/detect_ripples`). See `FINDINGS.md` §20 for
+the `eeg_instant_freq_power`/`detect_ripples` port write-up, including the confirmed `ripThresh`
+doc/code default mismatch (docstring says 4, code default is 5 — code's behaviour is what's ported)
+and the `deal(zeros(n))` "bug" that traced out numerically harmless.
 
 **v0.7 — Watershed-gated FieldShuffle. STATUS: DONE.** Segmentation (`watershed_fields`,
 `field_bin_locations`), `fs_shufFields` (`shuffle_fields` — genuine per-call randomness, validated
@@ -123,15 +126,25 @@ base-2 (bits). `imfilter 'symmetric'`→ndimage `reflect`, `'circular'`→`wrap`
 |---|---|---|---|---|---|
 | `getegf` (+ `.egf` reader) | `io/axona.py::_read_egf` | path | **YES (lfp)** | GF | core (infra) |
 | `eeg_convert_to_volts` | `io/axona.py::_eeg_to_volts` | A+meta | **YES (lfp)** | SYN+GF | core (infra) |
-| `eeg_instant_freq_power` | `analysis/lfp.py::instant_freq_power` | A | **YES (lfp)** | GF+SYN | core (after infra) |
+| `eeg_instant_freq_power` | `analysis/lfp.py::instant_freq_power` | A | **YES (lfp)** | GF+SYN | **DONE** — synthetic 8Hz-carrier recovery (<0.1Hz), real r1838 theta ~9.1Hz matching `power_spectrum`'s independent FFT peak |
 | `eeg_power_spectra` | `lfp.py::power_spectrum` | A | **YES (lfp)** | GF+SYN | core/useful (after infra) |
-| `detect_ripples` | `lfp.py::detect_ripples` | A | **YES (egf)** | SYN+GF (fix bugs) | useful (after infra) |
+| `detect_ripples` | `lfp.py::detect_ripples` | A | **YES (egf)** | SYN+GF (fix bugs) | **DONE** — synthetic embedded 150-250Hz bursts recovered at right times/freq; real r1838 egf plausibility check; see `FINDINGS.md` §20 |
 | `circ_regress_cb` | `analysis/phase_precession.py::circ_lin_regress` | A | **no** | SYN (Fisher B.20 R≈−0.316) | core (portable now) |
 
 Bugs to fix on port: `getegf` decimate factor vs comment (code wins: /4, /2 default IIR);
-`detect_ripples` `deal(zeros(n))` makes n×n matrix, empty-`ripStr` crash, trailing-ripple drop, default
-`ripThresh=5`; `eeg_power_spectra` float-equality argmax → `np.argmax`; reshape-to-50 Hz assumes exact
+`eeg_power_spectra` float-equality argmax → `np.argmax`; reshape-to-50 Hz assumes exact
 multiples (parametrise on `pos_sample_rate`).
+
+`detect_ripples` bugs — all confirmed by directly reading the source (see `FINDINGS.md` §20 for the
+full detail): the empty-`ripStr`/`ripEnd` crash is real and is now handled (returns an empty ripple
+set instead of erroring, since "no ripples anywhere" is a well-defined result); the trailing-ripple
+drop-off (an event still above threshold at the very end of the trace is silently discarded) is real
+and is faithfully preserved (well-defined, not a crash); `ripThresh`'s default is a genuine doc/code
+mismatch — the docstring claims 4, the code's actual `dfRipThresh` is 5 — and the port matches the
+code (5), not the stale docstring; `deal(zeros(n))` does build an n×n matrix instead of n×1, but
+tracing the subsequent linear/logical indexing by hand shows every value the loop writes and reads
+back lands in column 1 (identical memory positions to a proper n×1 vector) — so it's a confirmed,
+harmless memory-waste bug, not a correctness bug, and the port just uses correctly-shaped 1-D arrays.
 
 ### Analysis_Spatial_Field — place-field / spatial stats
 | function | barrylab target | consumes | needs-infra | oracle | priority |

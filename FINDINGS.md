@@ -365,10 +365,8 @@ fresh in 0-based terms rather than transcribing MATLAB's 1-based offset
 formula, to avoid an off-by-one.
 
 **`eeg_instant_freq_power.m` (bandpass + Hilbert instantaneous phase/frequency)
-and `detect_ripples.m` deferred, not ported.** Both are more involved
-(FIR bandpass design + `filtfilt` + Hilbert transform; ripple detection has
-several documented bugs per `PORTING_PLAN.md`) and time did not allow the
-same careful read-source/port/validate cycle used elsewhere. Still tracked.
+and `detect_ripples.m` were deferred at the time this section was written;
+both are now ported — see §20 for the full write-up.**
 
 **Validation.** Synthetic sinusoid embedded in noise: recovered peak
 frequency within 0.5 Hz and a clear, high signal-to-noise ratio. On real LFP
@@ -906,3 +904,126 @@ events from `pMat_data.mat`, see §13). Cross-SAC phase geometry
 (`cross_sac_props`) against a hand-built xSAC with exactly-known peak
 positions (see §15). Brandon-method ellipse regularisation's regular-hexagon
 identity (`m2MinR == m2MajR` algebraically — see §16).
+
+## 20. `eeg_instant_freq_power.m` / `detect_ripples.m`, v0.6b complete — a confirmed doc/code default mismatch, and a "bug" that traces out harmless
+
+Ported the last two theta/LFP functions: `eeg_instant_freq_power.m` ->
+`instant_freq_power()` (Blackman-windowed FIR bandpass + `filtfilt` +
+Hilbert transform -> instantaneous phase/amplitude/frequency, matching
+`scipy.signal.firwin(..., window="blackman", fs=eeg_freq)`'s default
+Nyquist-normalisation and passband scaling against MATLAB's
+`fir1(eegFreq, Wn/nyquist, blackman(eegFreq+1))`) and `detect_ripples.m` ->
+`detect_ripples()` (Csicsvari-style ripple detection built on top of it).
+Both live in `analysis/lfp.py` alongside the already-ported `power_spectrum`.
+
+**The MATLAB's `interp2`-based instantaneous-frequency re-centring was
+traced through by hand and replaced with an equivalent direct computation,
+not transcribed literally.** `diff(phase)` gives a length-(N-1) array of
+"between-sample" frequency estimates; the source re-centres this onto all N
+original samples via `interp2([freqEEG, ones(...)], ones(N+1,1),
+[0.5:1:N+0.5]')` — a two-argument `interp2` call that (traced step by step:
+implicit grid X=1:2/Y=1:(N-1), query xi always column 1, yi at half-integer
+positions 0.5..N+0.5) is exactly "linearly interpolate the diff array at its
+own midpoints, with the two out-of-domain endpoint queries (0.5 and N+0.5)
+returning NaN". Reproduced directly: `freq[0]=freq[-1]=nan`,
+`freq[i]=mean(d[i-1],d[i])` for interior `i`. Confirmed numerically
+equivalent (not just theoretically) via the synthetic 8Hz-carrier test below.
+
+**A confirmed, real doc/code mismatch: `detect_ripples.m`'s default
+`ripThresh` is 5, not the 4 its own docstring claims.** The function header
+comment says "The detection threshold is defined as mean + std * ripThresh.
+If not supplied default is 4", explicitly citing "Csisvari uses 4" — but the
+actual code sets `dfRipThresh = 5` with its own separate inline comment
+("Freyja uses 3 here - Csisvari uses 4"), i.e. the chosen default is
+*stricter* than either cited literature value and contradicts the
+function's own documented behaviour. This is a real inconsistency in the
+original MATLAB (not a porting ambiguity), confirmed by reading both lines
+side by side. Per the standing policy of matching actual behaviour over
+stale documentation, `detect_ripples()`'s default is 5, matching the code
+that actually runs — prominently flagged in the Python docstring so a user
+who has read the MATLAB header isn't misled. Pinned by
+`test_detect_ripples_default_threshold_matches_documented_code_default`.
+
+**`deal(zeros(length(ripStr)))` does build an n×n matrix instead of the
+evidently-intended n×1 column — traced through by hand and confirmed
+numerically harmless, contrary to the initial `PORTING_PLAN.md` note calling
+it a bug to fix.** `zeros(n)` with a scalar `n` is MATLAB shorthand for an
+n-by-n matrix, so `valid`/`pkPower`/`meanFreq` all come back n² in size, not
+the clearly-intended n×1. But the following loop only ever writes
+`valid(k)`/`pkPower(k)`/`meanFreq(k)` for `k=1..n` — and for an n×n matrix
+stored column-major, linear indices `1..n` fall entirely within column 1,
+i.e. exactly the same memory positions a correctly-shaped n×1 vector would
+occupy. Every later read (`valid(n)` inside the loop, then
+`logical(valid)` and `ripStr(valid)`/`pkPower(valid)`/`meanFreq(valid)` via
+logical indexing, which MATLAB resolves via `find()` over the full
+flattened array) only ever touches those same first-`n` linear positions,
+since columns 2..n of the oversized matrix are never written and so stay
+`false`/`0`. Traced this out by hand before writing any test, precisely
+because the porting plan had already flagged it as a bug needing a fix —
+confirming it *first* avoided baking an unnecessary behavioural change into
+the port. The only real cost in the original is a wasted, potentially large
+`n²` memory allocation, not wrong values; `detect_ripples()` simply uses
+correctly-shaped 1-D arrays throughout (there's no MATLAB output to
+preserve here, since the outputs are provably bit-identical).
+
+**The trailing-ripple drop-off is real and is faithfully preserved.**
+`ripStr = ripStr(1:length(ripEnd))` keeps only the first `length(ripEnd)`
+starts; if the trace ends while still above the low threshold (one more
+rise than fall), that final, unterminated ripple is silently dropped rather
+than reported with the trace's end as its boundary. This is well-defined
+(not a crash), so it's kept as-is per goal 1, documented prominently in
+`detect_ripples()`'s docstring.
+
+**The empty-candidate-list crash is real, realistic, and *is* worked
+around.** `ripStr(1)>ripEnd(1)` indexes element 1 of what can be a
+genuinely empty array whenever nothing anywhere in the trace crosses the
+low threshold — not a contrived edge case, but the expected outcome for any
+short or genuinely ripple-free recording (confirmed directly:
+`test_detect_ripples_no_activity_returns_empty` hits exactly this path on
+pure background noise). MATLAB errors here; "no ripples found" is a
+well-defined, useful result, so `detect_ripples()` returns empty arrays
+instead, per the standing crash-avoidance policy.
+
+**Also confirmed, cosmetic only:** `ripMinDur=60/1000`'s own inline comment
+("i.e. 40ms = 0.004") is wrong twice over — 60ms is not 40ms, and 40ms is
+0.04s, not 0.004s. The *value* (0.06s = 60ms) is what's actually used and
+what's ported; the comment is simply stale/miscopied, no code consequence.
+
+**Validation.** `instant_freq_power`: a synthetic 8Hz sinusoid (theta band,
+60s @ 250Hz) recovers `mean(freq)=8.00Hz` to <0.001Hz away from every-sample
+noise floor, and the pos-rate-downsampled version agrees to the same
+precision; the first/last samples are confirmed `nan` as expected from the
+interp2-equivalent centring; an explicit test confirms the deliberately
+non-integer downsampling ratio raises `ValueError`, and another confirms a
+trace with a few trailing samples beyond an exact block multiple is handled
+by dropping them rather than crashing. On real r1838 LFP (channel 1, `.egf`
+@ 4800Hz, first 60s): `nanmean(freq)=9.11Hz`, squarely in the theta band and
+closely matching `power_spectrum`'s independently-computed FFT peaks for
+the same channel (9.14-9.58Hz, per §10/§9) — strong cross-consistency
+between the two very differently-implemented theta measures (FFT peak vs.
+Hilbert instantaneous frequency).
+
+`detect_ripples`: three synthetic 150-250Hz oscillatory bursts (200Hz, 150ms
+each) injected into low-amplitude background noise (1200Hz trace, well
+above the 500Hz-plus Nyquist requirement the MATLAB source itself
+documents) are all three recovered, with start times within ~100ms of the
+true injected onset (the low-threshold expansion pads the window either
+side, as intended by the algorithm's own design) and `mean_freq` within
+15Hz of the true 200Hz carrier. A pure-noise trace with no injected bursts
+returns zero ripples (exercising the empty-candidate-list fix). On real
+r1838 egf data (channel 1, first 120s): 23 candidate ripple-band events
+with durations 65-190ms (comfortably above the 60ms minimum) and mean
+frequencies clustering 194-215Hz — squarely inside, not at the edges of,
+the requested 150-250Hz band, a meaningful sanity check that the filter
+design and edge-indexing are correct (a bug here would much more likely
+produce frequencies piled up at the band edges or wildly outside it than a
+clean mid-band distribution).
+
+**A design decision worth flagging:** `instant_freq_power` accepts
+`pos_sample_rate=None` to skip the position-rate downsampling step
+entirely. `detect_ripples` always calls it this way, since ripple detection
+never needs the downsampled output and the egf-rate signal's length isn't
+guaranteed to divide evenly by 50 (unlike the always-integer-ratio case for
+standard 250Hz `.eeg`) — this sidesteps a spurious `ValueError` for a
+computation that was never going to use that output anyway, rather than
+computing and discarding it.
