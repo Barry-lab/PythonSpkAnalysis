@@ -81,12 +81,35 @@ def head_direction_map(recording, electrode, cluster, bin_deg=DIR_BIN_DEG,
     return rate
 
 
-def circular_mean(angles, weights=None):
+def circular_mean(angles, weights=None, wrap="0_2pi"):
     """Weighted circular mean of angles in radians. Port of ``cb_circMean.m``.
 
-    Returns the mean angle in ``[0, 2*pi)``. NaNs in either input are treated as
-    mutual and ignored.
+    NaNs in either input are treated as mutual and ignored.
+
+    Parameters
+    ----------
+    angles : ndarray
+        Angles in radians.
+    weights : ndarray, optional
+        Per-angle weight; defaults to equal weighting.
+    wrap : {"0_2pi", "-pi_pi"}
+        Output range convention. ``"0_2pi"`` (default) matches ``cb_circMean.m``
+        exactly (``mod(meanAng, 2*pi)``). Use ``"-pi_pi"`` when the result feeds
+        into an operation that expects signed angles/offsets — e.g. MATLAB's
+        toolbox ``circ_mean`` (via its ``angle()`` call) returns this range, and
+        callers such as ``led2v1_dir_offset.m`` rely on it so that a negative
+        offset stays negative rather than wrapping to ``~360``. See
+        :func:`led2v1_dir_offset` and ``FINDINGS.md`` for why this distinction
+        matters: the two MATLAB functions are **not** interchangeable, only the
+        underlying mean angle is the same.
+
+    Returns
+    -------
+    float
+        Mean angle in radians, in the range selected by ``wrap``.
     """
+    if wrap not in ("0_2pi", "-pi_pi"):
+        raise ValueError("wrap must be '0_2pi' or '-pi_pi', got %r" % (wrap,))
     angles = np.asarray(angles, dtype=float)
     w = np.ones_like(angles) if weights is None else np.asarray(weights, dtype=float)
     w = np.where(np.isnan(angles), np.nan, w)
@@ -94,7 +117,9 @@ def circular_mean(angles, weights=None):
     sum_w = np.nansum(w)
     mean = np.arctan2(np.nansum(np.sin(angles) * w) / sum_w,
                       np.nansum(np.cos(angles) * w) / sum_w)
-    return np.mod(mean, 2 * np.pi)
+    if wrap == "0_2pi":
+        return np.mod(mean, 2 * np.pi)
+    return np.mod(mean + np.pi, 2 * np.pi) - np.pi
 
 
 def resultant_vector(tuning_curve):
@@ -184,6 +209,62 @@ def directional_fft(tuning_curve, smooth_hz=None):
     rel_freq = np.array([2, 3, 4, 5, 7])
     rel_power = (power / power[6])[rel_freq]  # 6-cycle component is power[6]
     return power, freqs, rel_freq, rel_power
+
+
+def _wrap_to_180(deg):
+    """Wrap angles (deg) to (-180, 180], matching MATLAB's ``wrapTo180``."""
+    return np.mod(np.asarray(deg, dtype=float) + 180.0, 360.0) - 180.0
+
+
+def led2v1_dir_offset(led2_dir_deg, led1_dir_deg):
+    """Angular bias between 2-LED and 1-LED heading estimates.
+
+    Port of ``led2v1_dir_offset.m``. Two-LED heading is more accurate but biased
+    if the experimenter mis-recorded the LED bearing offsets in the ``.set``
+    file; 1-LED (displacement) heading is less accurate but unbiased. Comparing
+    the two reveals any systematic offset, which can then be subtracted from the
+    2-LED heading: ``corrected = mod(two_led_dir - mean_offset, 360)``.
+
+    .. note::
+       The original MATLAB calls the toolbox ``circ_mean`` here, **not** the
+       lab's own ``cb_circMean`` (the function this module's
+       :func:`circular_mean` ports) — despite ``cb_circMean.m`` stating it was
+       written specifically "to replace unreliable circ_mean". This looks like
+       an oversight in the original codebase rather than a deliberate choice:
+       the two give the *same* mean angle (both reduce to
+       ``atan2(sum sin, sum cos)``), but ``circ_mean`` returns it in
+       ``(-pi, pi]`` where ``cb_circMean`` returns ``[0, 2*pi)``. Since this
+       function needs a signed offset (a small negative bias must stay
+       negative, not wrap to ~360), we call :func:`circular_mean` with
+       ``wrap="-pi_pi"`` to reproduce ``circ_mean``'s behaviour here — using
+       the default ``wrap="0_2pi"`` would silently corrupt the result. See
+       ``FINDINGS.md``.
+
+    Parameters
+    ----------
+    led2_dir_deg : ndarray
+        Heading from 2-LED tracking, degrees (e.g. ``recording.direction``).
+    led1_dir_deg : ndarray
+        Heading from 1-LED/displacement tracking, degrees (e.g.
+        ``recording.dir_disp`` in the MATLAB structure).
+
+    Returns
+    -------
+    (mean_offset_deg, peak_offset_deg)
+        Both in degrees; 0 means no bias, positive means the 2-LED estimate
+        runs anticlockwise of the 1-LED estimate.
+    """
+    diff = _wrap_to_180(np.asarray(led2_dir_deg) - np.asarray(led1_dir_deg))
+    valid = diff[~np.isnan(diff)]
+    mean_offset = np.degrees(circular_mean(np.radians(valid), wrap="-pi_pi"))
+
+    bin_centres = np.arange(-179.5, 180.0, 1.0)  # 360 one-degree bins
+    edges = np.concatenate([bin_centres - 0.5, [bin_centres[-1] + 0.5]])
+    counts, _ = np.histogram(valid, bins=edges)
+    smoothed = np.convolve(np.tile(counts, 3), np.ones(7) / 7.0, mode="same")
+    smoothed = smoothed[len(counts): 2 * len(counts)]  # circular smoothing via tiling
+    peak_offset = float(bin_centres[np.argmax(smoothed)])
+    return float(mean_offset), peak_offset
 
 
 def head_direction_stats(recording, electrode, cluster, bin_deg=DIR_BIN_DEG):

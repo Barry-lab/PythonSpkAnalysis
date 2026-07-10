@@ -8,6 +8,7 @@ from barrelab.analysis.direction import (
     directionality,
     head_direction_map,
     head_direction_stats,
+    led2v1_dir_offset,
     resultant_vector,
 )
 
@@ -28,6 +29,23 @@ def test_circular_mean_weighted():
     # heavy weight on 0 pulls the mean toward 0
     m = circular_mean([0.0, np.pi / 2], weights=[9.0, 1.0])
     assert 0 < m < np.radians(10)
+
+
+def test_circular_mean_wrap_convention_same_angle_different_range():
+    # a small negative-going mean: [0, 2pi) wraps it near 2pi; (-pi, pi] keeps it negative
+    angles = [np.radians(-5), np.radians(5), np.radians(-3)]
+    m_pos = circular_mean(angles, wrap="0_2pi")
+    m_signed = circular_mean(angles, wrap="-pi_pi")
+    assert m_pos > np.radians(300)          # wrapped up near 2*pi
+    assert -np.radians(10) < m_signed < 0   # stayed small and negative
+    # same physical angle on the circle either way
+    assert np.isclose(np.mod(m_pos, 2 * np.pi), np.mod(m_signed, 2 * np.pi))
+
+
+def test_circular_mean_rejects_bad_wrap():
+    import pytest
+    with pytest.raises(ValueError):
+        circular_mean([0.0, 1.0], wrap="bogus")
 
 
 def test_resultant_vector_uniform_is_zero():
@@ -80,3 +98,39 @@ def test_head_direction_map_on_example(example_trial):
     assert 0.0 <= stats["resultant_length"] <= 1.0
     assert 0.0 <= stats["preferred_direction"] < 360.0
     assert stats["directionality"] >= 0.0
+
+
+def test_led2v1_dir_offset_recovers_constant_bias():
+    rng = np.random.RandomState(0)
+    led1 = rng.uniform(0, 360, 2000)
+    true_offset = 12.0
+    led2 = np.mod(led1 + true_offset + rng.normal(0, 3.0, 2000), 360)
+    mean_offset, peak_offset = led2v1_dir_offset(led2, led1)
+    assert abs(mean_offset - true_offset) < 1.0
+    assert abs(peak_offset - true_offset) < 2.0  # 1-degree-binned, so a bit coarser
+
+
+def test_led2v1_dir_offset_recovers_negative_bias_without_wrapping():
+    # a negative bias must come back negative (near -8), NOT wrap to ~352 --
+    # this is exactly the circular_mean range-convention issue.
+    rng = np.random.RandomState(1)
+    led1 = rng.uniform(0, 360, 2000)
+    led2 = np.mod(led1 - 8.0 + rng.normal(0, 2.0, 2000), 360)
+    mean_offset, _ = led2v1_dir_offset(led2, led1)
+    assert -10.0 < mean_offset < -6.0
+
+
+def test_led2v1_dir_offset_zero_bias():
+    rng = np.random.RandomState(2)
+    led1 = rng.uniform(0, 360, 2000)
+    led2 = np.mod(led1 + rng.normal(0, 2.0, 2000), 360)
+    mean_offset, peak_offset = led2v1_dir_offset(led2, led1)
+    assert abs(mean_offset) < 1.0
+    assert abs(peak_offset) < 2.0
+
+
+def test_led2v1_dir_offset_ignores_nans():
+    led1 = np.array([10.0, 20.0, np.nan, 40.0] * 50)
+    led2 = np.array([15.0, 25.0, 99.0, 45.0] * 50)  # constant +5 offset where valid
+    mean_offset, _ = led2v1_dir_offset(led2, led1)
+    assert abs(mean_offset - 5.0) < 0.5

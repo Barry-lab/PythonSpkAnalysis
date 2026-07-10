@@ -13,6 +13,7 @@ consume. Typical use::
 
 from .core.recording import Electrode, Recording
 from .io.axona import load_dacq
+from .analysis._stats import nan_corr
 from .analysis.direction import (
     circular_mean,
     directional_fft,
@@ -20,6 +21,7 @@ from .analysis.direction import (
     directionality,
     head_direction_map,
     head_direction_stats,
+    led2v1_dir_offset,
     resultant_vector,
 )
 from .analysis.grid import (
@@ -29,7 +31,8 @@ from .analysis.grid import (
     spatial_autocorrelogram,
 )
 from .analysis.maps import occupancy_map, rate_map, smooth_ratemap, spike_map
-from .analysis.spatial import adaptive_binning, spatial_information
+from .analysis.place_fields import field_stats, spatial_coherence, spatial_correlation
+from .analysis.spatial import adaptive_binning, spatial_information, true_ppm_bounding_box
 
 __version__ = "0.1.0"
 
@@ -43,6 +46,7 @@ __all__ = [
     "smooth_ratemap",
     "spatial_information",
     "adaptive_binning",
+    "true_ppm_bounding_box",
     "spatial_autocorrelogram",
     "gridness",
     "grid_properties",
@@ -54,4 +58,9 @@ __all__ = [
     "resultant_vector",
     "directionality",
     "directional_fft",
+    "led2v1_dir_offset",
+    "field_stats",
+    "spatial_coherence",
+    "spatial_correlation",
+    "nan_corr",
 ]

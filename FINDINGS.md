@@ -62,7 +62,51 @@ current golden-master test.
   behaviour so numbers match; flag for the PI whether to fix it (only affects the
   expanding gridness, which maximises over radii anyway).
 
-## 3. Grid-cell analysis port (SAC + gridness), v0.2
+## 3. Head-direction + place-field stats port, v0.2/v0.3 — dependency check
+
+Prompted by a direct request to audit cross-function dependencies before reusing
+ported code (not just port each function in isolation):
+
+- **`led2v1_dir_offset.m` calls the *wrong* circular mean — genuinely worth
+  knowing.** `cb_circMean.m`'s own header says it was written "to replace
+  unreliable circ_mean", yet `led2v1_dir_offset.m` still calls the toolbox
+  `circ_mean`, not `cb_circMean`. Checked via `grep -rl cb_circMean` across the
+  whole MATLAB repo: `cb_circMean` has **no callers at all** outside its own
+  file — every consumer, including this one, was written (or left) against the
+  old function. This looks like an inherited inconsistency rather than a
+  deliberate choice. Practically: the two functions compute the *same* mean
+  angle (both reduce to `atan2(sum sin, sum cos)`), but `circ_mean` returns it
+  in `(-π, π]` (MATLAB's `angle()` convention) while `cb_circMean` returns
+  `[0, 2π)`. `led2v1_dir_offset` needs the signed range (a small negative bias
+  must stay negative, not wrap to ~355°). **Fix:** `circular_mean()` now takes
+  an explicit `wrap={"0_2pi", "-pi_pi"}` parameter (default `"0_2pi"`, matching
+  `cb_circMean.m` exactly for bit-for-bit continuity with existing callers);
+  `led2v1_dir_offset` explicitly requests `wrap="-pi_pi"`. This turns a
+  silent-corruption risk into a documented, tested choice at each call site —
+  see the docstrings in `analysis/direction.py`.
+- **`pcFieldStats.m`'s `nansum(rmS)==0` check works, but only by luck.**
+  `rmS` is a 2-D matrix; `nansum` without a dimension argument sums down
+  columns, returning a row vector, not a scalar — so this reads like a bug
+  (intent was clearly `rmS(:)`, i.e. the whole-matrix sum). MATLAB's `if` on a
+  vector requires *every* element to be truthy, which is exactly equivalent to
+  "grand total is zero" **only because firing rates are non-negative** (if
+  every column-sum is 0 and all values are ≥0, every value must be 0, and vice
+  versa). So the result is correct, just fragile — ported as the clear,
+  equivalent `np.nansum(rm) == 0` (flattened) rather than replicating the
+  column-wise quirk.
+- **`get_true_PPM_boundingBox.m` under-crops by one row and column — a real
+  off-by-one, faithfully reproduced.** `ijWidth = boundingBox([4 3]) - 1` then
+  `iRange = ijCorner(1):ijCorner(1)+ijWidth(1)-1` has one `-1` too many: it
+  should enumerate `r1:r2` (all rows of the bounding box) but actually gives
+  `r1:r2-1`, dropping the last row (and, symmetrically, the last column). This
+  doesn't affect the returned PPM value (computed from the filled *area*, not
+  from these ranges), only the crop ranges returned for callers who use them to
+  window the ratemap. Ported faithfully — see `true_ppm_bounding_box()`'s
+  docstring/comment in `analysis/spatial.py` — since goal 1 is matching
+  results, not silently fixing bugs; worth a PI decision on whether to correct
+  it once parity is established.
+
+## 5. Grid-cell analysis port (SAC + gridness), v0.2
 
 Ported `xPearson.m` -> `spatial_autocorrelogram`, `multiGridness.m` -> `gridness`
 (standard + expanding), and `sacProps.m` -> `grid_properties`. The MATLAB
@@ -82,7 +126,7 @@ scale comes out at 40 cm. To lock these bit-exact, `validation/generate_fixtures
 now also dumps `sac`, `gridness_std/exp`, `grid_scale/orientation/mean_r` from the
 current MATLAB; add a regression test asserting `np.allclose` once a fixture exists.
 
-## 4. Things confirmed correct and bit-exact
+## 6. Things confirmed correct and bit-exact
 
 `.pos`/tetrode/`.cut` binary readers (big-endian, 216-byte spikes, 20-byte pos
 records); LED swap + speed filtering; NaN interpolation; 20-tap boxcar position

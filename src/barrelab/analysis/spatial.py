@@ -6,7 +6,7 @@ spatial-information estimate).
 """
 
 import numpy as np
-from scipy.ndimage import convolve
+from scipy.ndimage import binary_fill_holes, convolve, label
 
 from ..params import ADAPTIVE_SMOOTH_ALPHA
 
@@ -117,3 +117,59 @@ def _disc_kernel(r, is_1d):
     yy, xx = np.mgrid[-n:n + 1, -n:n + 1]
     disc = (np.sqrt(xx ** 2 + yy ** 2) <= r).astype(float)
     return disc
+
+
+def true_ppm_bounding_box(occupancy_bins, bin_size_px, env_size_m):
+    """Infer the true pixels-per-metre from a square environment's occupied area.
+
+    Port of ``get_true_PPM_boundingBox.m``. The `.set` file's recorded PPM is
+    sometimes wrong; if the environment is square and its side length is known,
+    the true PPM can be inferred from how many bins the animal actually visited.
+    Finds the largest occupied (4-connected) region, fills any interior holes,
+    and derives PPM from ``sqrt(filled_area) * bin_size_px / env_size_m``.
+
+    Only reliable if the environment is well sampled — under-visited corners
+    make the visited area (and so the inferred PPM) an overestimate.
+
+    Parameters
+    ----------
+    occupancy_bins : ndarray
+        Binned dwell time/counts (e.g. from :func:`~barrelab.analysis.maps.occupancy_map`);
+        a bin is "visited" if its value is > 0.
+    bin_size_px : float
+        Bin size in camera pixels, as used to build ``occupancy_bins``.
+    env_size_m : float
+        Side length of the (square) environment, in metres.
+
+    Returns
+    -------
+    (ppm, i_range, j_range)
+        ``ppm`` is the inferred pixels-per-metre. ``i_range``/``j_range`` are
+        0-based Python ``range`` objects over the occupied region's rows/cols
+        (for cropping). **Note:** these faithfully reproduce an off-by-one in
+        the original MATLAB that excludes the region's last row and column —
+        see ``FINDINGS.md``. Returns ``(nan, range(0,0), range(0,0))`` if no
+        bin was ever visited.
+    """
+    visited = np.asarray(occupancy_bins) > 0
+    labelled, n = label(visited)  # scipy default = 4-connectivity in 2D
+    if n == 0:
+        return float("nan"), range(0, 0), range(0, 0)
+
+    filled_areas = np.empty(n)
+    bboxes = []
+    for i in range(1, n + 1):
+        mask = labelled == i
+        filled_areas[i - 1] = binary_fill_holes(mask).sum()
+        rows, cols = np.where(mask)
+        bboxes.append((rows.min(), rows.max(), cols.min(), cols.max()))
+
+    best = int(np.argmax(filled_areas))
+    filled_area = filled_areas[best]
+    r0, r1, c0, c1 = bboxes[best]
+
+    ppm = float(np.sqrt(filled_area) * bin_size_px / env_size_m)
+    # MATLAB: iRange = ijCorner(1):ijCorner(1)+ijWidth(1)-1, which (after
+    # translating the 1-based BoundingBox arithmetic) excludes the region's
+    # final row/col. Reproduced here rather than "fixed" — see FINDINGS.md.
+    return ppm, range(r0, r1), range(c0, c1)

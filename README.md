@@ -94,12 +94,15 @@ with [`validation/generate_fixtures.m`](validation/generate_fixtures.m).
 - [`docs/matlab_migration.md`](docs/matlab_migration.md) — where each `Universal_Matlab` function lands.
 - [`docs/adding_a_loader.md`](docs/adding_a_loader.md) — how to write a new front-end loader.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, tests, and coding conventions.
-- [`FINDINGS.md`](FINDINGS.md) — validation notes and the two intentional MATLAB differences.
+- [`FINDINGS.md`](FINDINGS.md) — validation notes, cross-function dependency gotchas, and known MATLAB quirks.
+- [`PORTING_PLAN.md`](PORTING_PLAN.md) — the master plan for porting everything still remaining, module by module.
 
 ## Roadmap
 
+Full detail and per-function status in [`PORTING_PLAN.md`](PORTING_PLAN.md).
+
 - **v0.1** — DACQ loader, `Recording`, rate maps, Skaggs info, MATLAB validation harness.
-- **v0.2 (in progress)** — spatial autocorrelogram + gridness ✓, head-direction tuning ✓; border/speed scores, place-field stats, plotting next.
+- **v0.2 (in progress)** — spatial autocorrelogram + gridness ✓, head-direction tuning ✓, place-field/coherence/correlation stats ✓; grid ellipse correction, 2-D FFT, plotting next.
 - **v0.3** — Neuropixels front end (SpikeGLX + Open Ephys via SpikeInterface + Kilosort4).
 - **v0.4 → v1.0** — LFP/theta/phase precession, Bayesian decoding, NWB export, plugin loader API.
 

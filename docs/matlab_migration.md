@@ -34,16 +34,31 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `multiGridness.m` | `gridness(sac)` → `(standard, expanding)` | public |
 | `sacProps.m` | `grid_properties(sac)` | public — scale/orientation/peaks |
 | `Analysis_Grid` (ellipse fit, 2-D FFT, field shuffle) | — | **not yet ported** (roadmap v0.2+) |
-| `cb_circMean.m` | `circular_mean(angles, weights)` | public — circular mean |
+| `cb_circMean.m` | `circular_mean(angles, weights, wrap=...)` | public — circular mean; see `wrap` note below |
 | `dir_kldiv.m` / `kldiv.m` | `directionality(tuning_curve)` | public — directionality index |
 | `circ_FTT.m` | `directional_fft(tuning_curve)` | public — multimodal/hexadirectional |
+| `led2v1_dir_offset.m` | `led2v1_dir_offset(led2_dir, led1_dir)` | public — 2-LED/1-LED heading bias |
 | (HD tuning curve) | `head_direction_map` / `head_direction_stats` | public — bins by direction |
-| `Analysis_Freq` (theta/LFP/phase) | — | **not yet ported** (roadmap v0.4+) |
-| `Decoding` (Bayesian) | — | **not yet ported** (roadmap v0.4+) |
-| spatial coherence/correlation | — | **not yet ported** |
+| `pcFieldStats.m` | `field_stats(rate_map, min_field_bins, min_rate)` | public — place-field size/rate |
+| `spatialCoherance.m` | `spatial_coherence(rate_map)` | public — smoothness/signal quality |
+| `spatialCorrelation.m` | `spatial_correlation(rm1, rm2, stack_maps=True)` | public — remapping/stability |
+| `nan_corr.m` | `nan_corr(var1, var2, corr_type="pearson")` | public — NaN/Inf-safe correlation |
+| `get_true_PPM_boundingBox.m` | `true_ppm_bounding_box(occupancy, bin_px, env_m)` | public — infer true PPM |
+| `Analysis_Freq` (theta/LFP/phase) | — | **not yet ported** (needs EEG/EGF loader first — see `PORTING_PLAN.md`) |
+| `Decoding` (Bayesian) | — | **not yet ported** (`PORTING_PLAN.md` v0.4) |
+| grid ellipse fit/correct, 2-D FFT, field shuffle | — | **not yet ported** (`PORTING_PLAN.md` v0.5/v0.7) |
 
 Everything marked *internal* runs inside `load_dacq`; you do not call it directly,
 but it is exposed for validation and testing.
+
+**A dependency gotcha worth knowing about `circular_mean`.** `circular_mean()`
+defaults to `wrap="0_2pi"`, matching `cb_circMean.m` exactly. But if you're
+porting or comparing against a MATLAB function that instead calls the toolbox
+`circ_mean` (as `led2v1_dir_offset.m` does — see `FINDINGS.md` §3), that
+function's angles come back in `(-π, π]`, not `[0, 2π)`. The mean angle is
+identical either way; only the range differs. Pass `wrap="-pi_pi"` when you
+need the signed convention. See the full porting plan and dependency notes in
+[`PORTING_PLAN.md`](../PORTING_PLAN.md).
 
 ## How you used to / how you do it now
 
