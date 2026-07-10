@@ -1,11 +1,12 @@
 """Elliptical grid correction: fit and remove elliptical distortion from a SAC.
 
 Ports ``gridEllipse_fit.m`` (fit an ellipse to a grid cell's six central SAC
-peaks, giving x/y scale and eccentricity) and ``gridEllipse_correct.m``
+peaks, giving x/y scale and eccentricity), ``gridEllipse_correct.m``
 (regularise an elliptical SAC back toward circular, so gridness can be
-recomputed on the corrected map). ``regularise_eliptic_grid.m`` is a
-byte-identical duplicate of ``gridEllipse_correct.m`` in the original — ported
-once here.
+recomputed on the corrected map), and ``brandonRegEcc.m`` (an alternative,
+simpler ellipse estimate from just the closest/furthest of the six central
+peaks). ``regularise_eliptic_grid.m`` is a byte-identical duplicate of
+``gridEllipse_correct.m`` in the original — ported once here.
 
 The ellipse-fit itself (``_fit_ellipse``) is a least-squares conic fit
 originally from the MathWorks File Exchange, embedded in ``gridEllipse_fit.m``
@@ -15,7 +16,7 @@ as a subfunction; ported faithfully for portability, as the original was.
 import numpy as np
 from scipy.ndimage import map_coordinates, rotate
 
-from .grid import _sac_peaks
+from .grid import _raw_regional_max_peaks, _sac_peaks
 
 
 def _fit_ellipse(x, y):
@@ -181,3 +182,117 @@ def regularise_elliptic_sac(sac, ab_scale, orient_deg):
     start_col = (reg.shape[1] - sac.shape[1]) // 2
     reg = reg[start_row: start_row + sac.shape[0], start_col: start_col + sac.shape[1]]
     return reg
+
+
+def brandon_regularise(sac):
+    """Regularise an elliptical SAC via the Brandon (2011) method.
+
+    Port of ``brandonRegEcc.m``. An alternative to :func:`fit_grid_ellipse` +
+    :func:`regularise_elliptic_sac`'s least-squares approach: estimates the
+    ellipse's major/minor axes from just the closest and furthest of the six
+    central peaks, in two different ways, then regularises the SAC with each
+    estimate independently.
+
+    .. note::
+       The MATLAB docstring calls this method "a bit clunky" and says it
+       "doesn't actually work that well -- certainly not as well as" the
+       least-squares fit, kept mainly because the least-squares fit can fail
+       (multiple minima) in some cases.
+
+       Peak detection here follows ``fs_fastGridness.m``/``xSacProps.m``'s
+       convention (``imregionalmax`` with no positive-value restriction), NOT
+       :func:`fit_grid_ellipse`/:func:`gridness`'s ``multiGridness.m``
+       convention -- confirmed by reading ``brandonRegEcc.m`` directly, not
+       assumed from the similar name. See ``FINDINGS.md``.
+
+       The MATLAB source's own comment flags that its first axis-length
+       formula "requires a sqrt of a negative value... I've just ignored the
+       negative sign" -- i.e. it can legitimately go complex, and MATLAB's
+       ``abs()`` of a complex number returns its magnitude. Faithfully
+       reproduced with ``numpy.lib.scimath.sqrt`` (which, like MATLAB's
+       ``sqrt``, promotes a negative real argument to a complex result
+       rather than ``nan``). Method 1's axis lengths are wrapped in
+       ``abs()`` before use, matching the MATLAB call
+       (``abs([m1MajR, m1MinR])``) -- but **method 2's are not** (the MATLAB
+       call is the bare ``[m2MajR, m2MinR]``), which is asymmetric with
+       method 1's treatment of the identical failure mode and looks like an
+       oversight in the original rather than a deliberate choice. Faithfully
+       preserved: for method 2, if the axis length comes out complex, its
+       real part is used, since :func:`regularise_elliptic_sac` sorts/compares
+       its ``ab_scale`` argument (undefined for complex numbers in Python,
+       unlike MATLAB's real-part-based complex comparison) -- this only
+       changes what happens in an already-degenerate corner the original
+       author's own comment says is not well understood.
+
+    Parameters
+    ----------
+    sac : ndarray
+        Spatial autocorrelogram (from a smoothed rate map).
+
+    Returns
+    -------
+    (rsac1, rsac2)
+        Two independently-regularised SACs (method 1: minor axis from the
+        closest peak; method 2: major axis from the furthest peak). Returns
+        the original ``sac`` unchanged (twice) if fewer than 4 peaks are
+        found, or per-method if that method's major/minor axis ratio exceeds
+        2x (Brandon 2011's own no-correction criterion).
+    """
+    sac = np.real(np.asarray(sac, dtype=float))
+    filled = np.where(np.isnan(sac), -1.0, sac)
+
+    peak_m, peak_n = _raw_regional_max_peaks(filled)  # 0-based
+    n_rows, n_cols = filled.shape
+    central_row = int(np.ceil(n_rows / 2.0))  # 1-based
+    central_col = int(np.ceil(n_cols / 2.0))
+    dx = (peak_n + 1.0) - central_col
+    dy = (peak_m + 1.0) - central_row
+    # "Not euclidian" (MATLAB's own comment) -- squared, unrooted distance,
+    # used only to rank/sort peaks so the monotonic transform doesn't matter.
+    dist_sq = dx ** 2 + dy ** 2
+    order = np.argsort(dist_sq, kind="stable")
+    # closestPeaks(2:min(7,length)) -- drop index 0, the central peak itself.
+    closest = order[1:min(7, order.size)]
+
+    if closest.size < 4:
+        return sac.copy(), sac.copy()
+
+    # x,y pairs (1-based), y counting down from top, origin top-left.
+    px = peak_n[closest] + 1.0
+    py = peak_m[closest] + 1.0
+    ang = np.arctan2(-py, px)
+    r = np.hypot(px, py)
+    close_ang, close_r = ang[0], r[0]
+    dist_ang, dist_r = ang[-1], r[-1]
+
+    theta = np.mod(close_ang - dist_ang, 2 * np.pi)
+    cos_sq_th = np.cos(theta) ** 2
+    sin_sq_th = np.sin(theta) ** 2
+    csqrt = np.lib.scimath.sqrt
+
+    # Method 1: minor axis set to the closest peak; estimate major axis.
+    m1_min_r = close_r
+    m1_maj_th = np.mod(close_ang + np.pi / 2, 2 * np.pi)
+    m1_maj_r = csqrt(cos_sq_th / ((sin_sq_th / close_r ** 2) - (dist_r ** -2)))
+
+    # Method 2: major axis set to the furthest peak; estimate minor axis.
+    m2_maj_r = dist_r
+    m2_maj_th = np.mod(dist_ang, 2 * np.pi)
+    m2_min_r = csqrt(sin_sq_th / ((close_r ** -2) - (cos_sq_th / dist_r ** 2)))
+
+    if abs(m1_maj_r) > 2 * abs(m1_min_r):
+        rsac1 = sac.copy()
+    else:
+        rsac1 = regularise_elliptic_sac(
+            sac, (abs(m1_maj_r), abs(m1_min_r)), float(np.degrees(m1_maj_th))
+        )
+
+    m2_min_r_real = m2_min_r.real if np.iscomplexobj(m2_min_r) else m2_min_r
+    if m2_maj_r > 2 * m2_min_r_real:
+        rsac2 = sac.copy()
+    else:
+        rsac2 = regularise_elliptic_sac(
+            sac, (float(m2_maj_r), float(m2_min_r_real)), float(np.degrees(m2_maj_th))
+        )
+
+    return rsac1, rsac2

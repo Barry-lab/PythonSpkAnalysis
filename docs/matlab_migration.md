@@ -61,6 +61,7 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `lineTraj_get_res.m` | `line_trajectory.line_residual(pmat, line_band)` | public — score a line-band mask against a pMat |
 | `gridEllipse_fit.m` | `fit_grid_ellipse(sac)` | public — ellipse fit to 6 central peaks |
 | `gridEllipse_correct.m` / `regularise_eliptic_grid.m` | `regularise_elliptic_sac(sac, ab_scale, orient_deg)` | public — de-ellipse a SAC |
+| `brandonRegEcc.m` | `grid_ellipse.brandon_regularise(sac)` → `(rsac1, rsac2)` | public — a self-admittedly weaker alternative ellipse correction, see its docstring |
 | `read_eeg_file.m` | `io.axona._read_eeg` | internal — 250Hz .eeg reader |
 | `getegf.m` (raw read only, no decimation — see `FINDINGS.md`) | `io.axona._read_egf` | internal — 4.8kHz .egf reader |
 | `eeg_convert_to_volts.m` | `io.axona.eeg_convert_to_volts(samples, channel, settings, kind)` | public — counts to volts |

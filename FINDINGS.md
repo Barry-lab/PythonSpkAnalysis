@@ -669,7 +669,64 @@ failing — added an explicit `ValueError` for this precondition so the failure
 mode matches MATLAB's in spirit (a clear error) even though the literal
 mechanism differs.
 
-## 16. Things confirmed correct and bit-exact
+## 16. `brandonRegEcc.m` -> `brandon_regularise`, v0.5 — a self-acknowledged rough method
+
+Ported `brandonRegEcc.m` into `grid_ellipse.py::brandon_regularise`, alongside
+the already-ported least-squares ellipse fit/correction
+(`fit_grid_ellipse`/`regularise_elliptic_sac`). The MATLAB source's own
+docstring is candid that this is a *worse* method kept only as a fallback:
+"a bit clunky," "doesn't actually work that well — certainly not as well as"
+the least-squares fit, and it flags its own first axis-length formula as
+possibly needing a sqrt of a negative number ("I've just ignored the
+negative sign").
+
+**Confirmed by reading the source directly (not assumed from the similar
+name) that peak detection here follows `fs_fastGridness.m`/`xSacProps.m`'s
+convention** — raw `imregionalmax` with no positive-value restriction — NOT
+`multiGridness.m`'s convention (used by `fit_grid_ellipse`). Since this
+"unrestricted `imregionalmax` + column-major `find()`" pattern is now needed
+by three ported functions (`fast_gridness`, `cross_sac_props`,
+`brandon_regularise`), consolidated it into a shared
+`grid.py::_raw_regional_max_peaks` helper — a refactor of code written this
+session (not a change to older, separately-validated code), verified
+behaviour-preserving by re-running the existing `fast_gridness`/
+`cross_sac_props` test suites unchanged before and after.
+
+**The MATLAB's acknowledged possibly-negative-sqrt is real and was handled
+carefully, including an asymmetry between the two output methods.** MATLAB's
+`sqrt` promotes a negative real to a complex result; a naive `numpy.sqrt`
+would instead give `nan` with a warning — used `numpy.lib.scimath.sqrt` to
+match. Method 1's call wraps its axis lengths in `abs()` (`abs([m1MajR,
+m1MinR])`, which for a complex number in MATLAB returns the magnitude) but
+**method 2's call does not** (`[m2MajR, m2MinR]`, bare) — the identical
+failure mode is treated differently between the two methods, which reads
+like an oversight rather than a deliberate choice. Faithfully preserved: for
+method 2, a complex result's real part is used before comparison/regularisation
+(since `regularise_elliptic_sac` sorts its `ab_scale` argument, undefined for
+complex numbers in Python, unlike MATLAB's real-part-based complex
+ordering) — this only changes behaviour in an already-degenerate corner the
+original author's own comment says isn't well understood, not a
+divergence from any well-defined MATLAB behaviour.
+
+**Validation — structural, matching how the *better* least-squares method
+was itself validated (no MATLAB runtime, and this method is explicitly
+weaker).** No crashes on real or synthetic input; correctly returns the
+input SAC unchanged (both methods) when fewer than 4 peaks are found (using
+the same strictly-monotonic-ramp construction established in `test_grid.py`
+to avoid the flat-background tie confound — see §14). A genuine,
+algebraically-derivable check: for a perfectly regular (non-elliptical)
+hexagonal lattice, the six central peaks are equidistant from the centre, so
+`closeR == distR`; substituting into method 2's minor-axis formula gives
+`sin²θ/((1/R²)−(cos²θ/R²)) = R²` exactly, independent of θ — i.e. method 2's
+major/minor estimates must come out equal, triggering
+`regularise_elliptic_sac`'s own `a==b` shortcut and returning the SAC
+completely unchanged. Confirmed exactly on a synthetic regular hex grid. On
+a deliberately elongated synthetic hex grid, gridness improves after
+correction for at least one of the two methods (method 2 sometimes leaves
+the SAC unchanged even here, and method 1 shows the improvement) — consistent
+with, not contradicting, the source's own "doesn't always work" caveat.
+
+## 17. Things confirmed correct and bit-exact
 
 `.pos`/tetrode/`.cut` binary readers (big-endian, 216-byte spikes, 20-byte pos
 records); LED swap + speed filtering; NaN interpolation; 20-tap boxcar position
@@ -678,4 +735,5 @@ smoothing (scipy `origin=0` matches MATLAB `imfilter`); `timestamp/timebase`;
 Line-trajectory best-fit-line round-trip self-consistency (118/118 real replay
 events from `pMat_data.mat`, see §13). Cross-SAC phase geometry
 (`cross_sac_props`) against a hand-built xSAC with exactly-known peak
-positions (see §15).
+positions (see §15). Brandon-method ellipse regularisation's regular-hexagon
+identity (`m2MinR == m2MajR` algebraically — see §16).

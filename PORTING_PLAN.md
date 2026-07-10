@@ -70,9 +70,11 @@ of `gridness`/`grid_properties` (see its docstring + `FINDINGS.md`). `xSacProps`
 supported cross mode privately, just needed a public wrapper); core geometry validated exact against a
 hand-built known-peak fixture, and a likely genuine MATLAB fragility found on realistic data (zero-clip
 before peak-finding swamps the true structure — see `FINDINGS.md`), faithfully preserved and documented,
-not fixed. Still to do: the 2D-FFT subpackage (`fftVars`, `get_2d_fft`, `get_polar_fft`,
-`main_spatial_fft2`) — the largest remaining v0.5 piece (a 1000-iteration shuffle significance test).
-Niche siblings (`brandonRegEcc`, `sacProps90deg`) only if elliptical / square-grid analysis is wanted.
+not fixed. `brandonRegEcc` DONE — `grid_ellipse.py::brandon_regularise`, a self-admittedly weaker
+alternative ellipse correction (validated structurally, including one exact algebraic identity for
+regular hex grids — see `FINDINGS.md`). Still to do: the 2D-FFT subpackage (`fftVars`, `get_2d_fft`,
+`get_polar_fft`, `main_spatial_fft2`) — the largest remaining v0.5 piece (a 1000-iteration shuffle
+significance test). Niche `sacProps90deg` only if square-grid analysis is wanted.
 
 **v0.6 — NEW INFRA: EEG/EGF loading (v0.6a DONE) → then LFP/theta analysis (v0.6b PARTIAL: power_spectrum DONE; eeg_instant_freq_power/detect_ripples deferred).**
 *v0.6a (infra):* add `.eeg` (int8, 250 Hz) and `.egf` (int16, 4.8 kHz) reading to the DACQ loader, an
@@ -150,7 +152,7 @@ vector (docstring says mean — averaging line is commented out); preserve, expo
 | `gridEllipse_fit` | `analysis/grid_ellipse.py::fit_grid_ellipse` | A | no | GF | useful |
 | `gridEllipse_correct` | `grid_ellipse.py::regularise_elliptic_sac` | A | no | GF | useful |
 | `regularise_eliptic_grid` | *(byte-identical dup)* alias to above | A | no | — | **skip (dup)** |
-| `brandonRegEcc` | `grid_ellipse.py::brandon_regularise` | A | no | GF (low value) | niche |
+| `brandonRegEcc` | `grid_ellipse.py::brandon_regularise` | A | no | SYN (regular-hex algebraic identity + structural; see `FINDINGS.md`) | **DONE** |
 | `sacProps90deg` | `grid.py::square_grid_props` (or `symmetry=4` flag) | A | no | GF+STRUCT | niche |
 | `xSacProps` | `analysis/grid_phase.py::cross_sac_props` | A | no | SYN (hand-built known-peak fixture, exact match; see `FINDINGS.md` for a likely genuine MATLAB fragility found on realistic input) | **DONE** |
 | `fftVars` | `analysis/spatial_fft.py::FFTParams` (dataclass) | — | no | — | useful |

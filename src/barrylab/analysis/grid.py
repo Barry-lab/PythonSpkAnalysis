@@ -335,6 +335,26 @@ def _regional_minima_1d(x):
     return is_min
 
 
+def _raw_regional_max_peaks(filled):
+    """0-based ``(row, col)`` of every ``imregionalmax`` peak pixel.
+
+    NOT restricted to positive values (unlike the ``_sac_peaks`` helper
+    behind :func:`gridness`/:func:`grid_properties`, which follows
+    ``multiGridness.m``'s convention of masking non-positive bins to -1
+    before peak detection). Shared by :func:`fast_gridness`,
+    :func:`~barrylab.analysis.grid_phase.cross_sac_props` and
+    :func:`~barrylab.analysis.grid_ellipse.brandon_regularise`, whose MATLAB
+    sources (``fs_fastGridness.m``, ``xSacProps.m``, ``brandonRegEcc.m``) all
+    use this exact unrestricted-``imregionalmax``-then-``find()`` pattern.
+    Peaks are returned in MATLAB's column-major ``find()`` order, since that
+    order matters for tie-breaking wherever a caller later truncates to the
+    N closest peaks.
+    """
+    is_max = filled == maximum_filter(filled, size=3, mode="nearest")
+    flat_idx = np.flatnonzero(is_max.ravel(order="F"))
+    return np.unravel_index(flat_idx, is_max.shape, order="F")
+
+
 def fast_gridness(sac):
     """Fast standard + expanding (Langston 2011) gridness, and grid scale.
 
@@ -386,11 +406,7 @@ def fast_gridness(sac):
     filled = np.where(np.isnan(sac), -1.0, sac)
     n_rows, n_cols = filled.shape
 
-    is_max = filled == maximum_filter(filled, size=3, mode="nearest")
-    # find(peaksSAC) traverses in MATLAB's column-major order; tie-break order
-    # matters for which pixels land in the "closest 7" below.
-    flat_idx = np.flatnonzero(is_max.ravel(order="F"))
-    ys, xs = np.unravel_index(flat_idx, is_max.shape, order="F")
+    ys, xs = _raw_regional_max_peaks(filled)
     if ys.size < 2:
         return float("nan"), float("nan"), float("nan")
 

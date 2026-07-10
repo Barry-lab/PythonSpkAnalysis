@@ -7,7 +7,8 @@ the output of :func:`~barrylab.analysis.grid.cross_correlogram`.
 """
 
 import numpy as np
-from scipy.ndimage import maximum_filter
+
+from .grid import _raw_regional_max_peaks
 
 
 def _cart2pol(x, y):
@@ -88,10 +89,7 @@ def cross_sac_props(xsac):
     xsac = np.where(np.isnan(xsac), -1.0, xsac)
     xsac = np.where(xsac < 0, 0.0, xsac)
 
-    is_max = xsac == maximum_filter(xsac, size=3, mode="nearest")
-    # find(peaks) traverses in MATLAB's column-major order.
-    flat_idx = np.flatnonzero(is_max.ravel(order="F"))
-    peak_m, peak_n = np.unravel_index(flat_idx, is_max.shape, order="F")  # 0-based
+    peak_m, peak_n = _raw_regional_max_peaks(xsac)  # 0-based
     if peak_m.size < 7:
         # MATLAB indexes dist(2:7) unconditionally and would error out here
         # too (an out-of-bounds index) -- raise explicitly rather than let

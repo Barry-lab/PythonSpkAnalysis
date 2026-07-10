@@ -39,7 +39,7 @@ from .analysis.grid import (
     gridness,
     spatial_autocorrelogram,
 )
-from .analysis.grid_ellipse import fit_grid_ellipse, regularise_elliptic_sac
+from .analysis.grid_ellipse import brandon_regularise, fit_grid_ellipse, regularise_elliptic_sac
 from .analysis.grid_phase import cross_sac_props
 from .analysis.lfp import power_spectrum
 from .analysis.line_trajectory import best_line, line_residual, reget_line_band
@@ -91,6 +91,7 @@ __all__ = [
     "circular_linear_regression",
     "fit_grid_ellipse",
     "regularise_elliptic_sac",
+    "brandon_regularise",
     "power_spectrum",
     "best_line",
     "reget_line_band",
