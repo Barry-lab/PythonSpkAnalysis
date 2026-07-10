@@ -3,13 +3,16 @@
 ``load_dacq`` reads a raw DACQ trial (a set of files sharing one basename) and
 returns a :class:`~barrylab.core.recording.Recording`. It ports the master
 ``read_DACQ.m`` and the per-file readers ``read_pos_file.m``,
-``read_tetrode_file.m`` and ``read_cut_file.m``.
+``read_tetrode_file.m`` and ``read_cut_file.m``. Also ports the standalone
+auxiliary readers/writer :func:`read_inp` (``read_INP_file.m``), :func:`read_stm`
+(``read_stm_file.m``) and :func:`write_cut` (``write_cut_file.m``).
 
 The public entry point is :func:`load_dacq`; the ``_read_*`` helpers are exposed
 for validation and testing but are not part of the stable API.
 """
 
 import os
+import warnings
 from typing import Optional
 
 import numpy as np
@@ -106,6 +109,205 @@ def _read_cut(path):
     # Bare .clu: an optional leading count then one id per spike.
     ids = [int(t) for t in tokens if t.lstrip("-").isdigit()]
     return np.array(ids, dtype=int)
+
+
+def read_inp(path):
+    """Read a ``.inp`` file: DACQ digital-timestamp events (button presses, DIO).
+
+    Port of ``read_INP_file.m``. Each event is a fixed 7-byte record: a 4-byte
+    big-endian timestamp, a 1-byte ASCII event type (``'I'``/``'O'``/``'K'`` for
+    digital input / digital output / keypress respectively), and a 2-byte
+    encoded channel bitmask. The file logs both the onset *and* offset of
+    digital events, so a positive-channel ``'I'``/``'O'`` event is typically
+    followed by a channel-0 "off" event (see the MATLAB source's own header
+    comment for the full field semantics); keypress (``'K'``) channels are not
+    decoded (the two-number DACQ keypress code is left as NaN), matching the
+    original.
+
+    No example ``.inp`` file ships with ``Universal_Matlab``'s ``Example_data``,
+    so this is validated structurally (a synthetic file built byte-for-byte
+    from the documented header/record layout) rather than against real data --
+    see ``tests/test_inp_stm_cut.py`` and ``FINDINGS.md``.
+
+    Parameters
+    ----------
+    path
+        Full path to the ``.inp`` file.
+
+    Returns
+    -------
+    (time, type, chan)
+        ``time`` -- ndarray (n_events,) of event times in seconds.
+        ``type`` -- ndarray (n_events,) of single-character event-type strings.
+        ``chan`` -- ndarray (n_events,) of channel numbers (1-16 for digital
+        events, 0 for a digital "off" event, NaN for keypresses).
+    """
+    header, data = read_axona_file(path, has_binary=True)
+    timebase = key_value(header, "timebase", "num")
+
+    # Assumes the binary segment is an exact multiple of 7 bytes (one event
+    # each); any trailing partial bytes are silently dropped, matching the
+    # truncating convention already used by _read_pos/_read_tetrode above.
+    n_events = len(data) // 7
+    buf = np.frombuffer(data, dtype=np.uint8)[: n_events * 7].reshape(n_events, 7)
+
+    time = big_endian_view(buf[:, :4], np.int32).reshape(-1).astype(np.float64) / timebase
+    event_type = np.array([chr(b) for b in buf[:, 4]])
+
+    # Channel: byte 6 (0-indexed column 0) encodes channels 9-16 (bit 0 = ch9),
+    # byte 7 (column 1) encodes channels 1-8 (bit 0 = ch1). At most one bit is
+    # expected to be set per byte, so log2 of the byte value recovers its bit
+    # position; a byte of 0 (no bit set) -> log2(0) = -inf -> nan, and the
+    # nansum below then contributes 0 for that byte -- exactly reproducing the
+    # "off" (channel 0) signal the MATLAB header comment describes, and MATLAB's
+    # own nansum-of-two-NaNs-is-0 behaviour when neither byte has a bit set.
+    chan_bytes = buf[:, 5:7].astype(np.float64)
+    with np.errstate(divide="ignore"):
+        bits = np.log2(chan_bytes)
+    bits[np.isinf(bits)] = np.nan
+    bits[:, 0] += 9  # byte 6: channels 9-16
+    bits[:, 1] += 1  # byte 7: channels 1-8
+    chan = np.nansum(bits, axis=1)
+    chan[event_type == "K"] = np.nan
+
+    return time, event_type, chan
+
+
+def read_stm(path):
+    """Read a ``.stm`` file: DACQ stimulator event timestamps (via the DIO port).
+
+    Port of ``read_stm_file.m``. The MATLAB source hard-codes a fixed 11-line
+    text header followed directly by a big-endian ``uint32`` binary stream (one
+    timestamp per 4 bytes), ending just before a trailing ``data_end`` marker.
+
+    Ported using the same robust ``data_start``/``data_end`` marker search
+    already used by every other reader in this module, rather than
+    transcribing the original's fragile fixed-line-count parsing (which only
+    works if the header always has exactly 11 lines before the marker) --
+    the identical design choice already made for ``.egf`` (see
+    :func:`_read_egf`'s docstring: ``getegf.m``'s hard-coded "skip exactly 10
+    header lines" approach was replaced with the marker search for the same
+    reason).
+
+    No example ``.stm`` file ships with ``Universal_Matlab``'s ``Example_data``,
+    so this is validated structurally rather than against real data -- see
+    ``tests/test_inp_stm_cut.py`` and ``FINDINGS.md``.
+
+    Parameters
+    ----------
+    path
+        Full path to the ``.stm`` file.
+
+    Returns
+    -------
+    (stim_time, header)
+        ``stim_time`` -- ndarray of stimulator event times in seconds.
+        ``header`` -- the parsed header (list of ``(key, value)`` pairs).
+    """
+    header, data = read_axona_file(path, has_binary=True)
+    timebase = key_value(header, "timebase", "num")
+
+    n_values = len(data) // 4
+    buf = np.frombuffer(data, dtype=np.uint8)[: n_values * 4]
+    stim_time = big_endian_view(buf, np.uint32).reshape(-1).astype(np.float64) / timebase
+    return stim_time, header
+
+
+def write_cut(spike_assignment, dir_path, file_stem, tetrode_no, max_cluster_warn=30):
+    """Write cluster assignments to a Tint-compatible ``.cut`` file.
+
+    Port of ``write_cut_file.m``. Writes (overwriting without warning, matching
+    the original) ``<dir_path>/<file_stem>_<tetrode_no>.cut`` -- the filename
+    convention Tint requires to associate a cut file with its tetrode file.
+    Cluster 0 is reserved for "junk" (unlike KlustaKwik's ``.clu`` convention).
+
+    **Two MATLAB bugs found while reading the source, both fixed rather than
+    faithfully reproduced -- see ``FINDINGS.md`` for the full detail:**
+
+    1. ``write_cut_file.m``'s data-header line hard-codes the literal string
+       ``Exact_cut_for: 1500728a`` -- one specific historic session's name --
+       completely ignoring its own ``fileStem`` argument (a clear copy-paste
+       bug, not an intentional convention: a self-consistent cut-file writer
+       must embed the filename it was actually given). Fixed: this port writes
+       the real ``file_stem``.
+    2. A stale-loop-variable bug silently drops the *entire* spike-assignment
+       body for any cut file with <=25 total spikes. MATLAB's data-row loop
+       (``for n=0:ceil(nSpikes/25)-2``) reuses the loop variable ``n`` from an
+       earlier, unrelated loop (writing the per-cluster header blocks); when
+       the data-row loop's range is empty (true whenever ``nSpikes<=25``),
+       MATLAB does not execute the loop body at all and leaves ``n`` at its
+       *stale* value from the cluster-header loop, so the subsequent
+       ``startLastRow=25*(n+1)+1`` computes a nonsensical, far-too-large
+       starting index -- the final tail loop then also finds its range empty
+       and writes *no* spike-assignment values at all, producing a cut file
+       with a correct header but a completely empty (and, worse, silently so)
+       body. This is a genuine, previously-undocumented bug (distinct from the
+       one flagged in ``PORTING_PLAN.md``), confirmed by tracing the loop
+       variable's scope by hand. Not preserved: this is silent data loss with
+       no well-defined behaviour worth keeping, and faithfully reproducing it
+       would break the very round-trip validation this port is checked with
+       (a small synthetic cluster-assignment vector -- the natural choice for
+       a unit test -- has well under 25 spikes). Fixed by computing the number
+       of full 25-wide rows directly (``max(0, ceil(n_spikes/25) - 1)``)
+       instead of relying on a loop variable's post-loop value.
+
+    Parameters
+    ----------
+    spike_assignment : array-like of int
+        One integer cluster id per spike (0 = junk).
+    dir_path : str
+        Directory to write into.
+    file_stem : str
+        Session filename stem (matches the ``.set``/tetrode files' basename);
+        embedded in the ``Exact_cut_for:`` header line.
+    tetrode_no : int
+        Tetrode number this cut file corresponds to.
+    max_cluster_warn : int, optional
+        Warn (not raise, matching the original) if the maximum cluster id
+        exceeds this (default 30, matching ``write_cut_file.m``'s ``maxCluster``).
+
+    Returns
+    -------
+    str
+        The full path written to.
+    """
+    spike_assignment = np.asarray(spike_assignment, dtype=int).ravel()
+    if spike_assignment.size == 0:
+        raise ValueError("spike_assignment must not be empty")
+    n_spikes = spike_assignment.size
+    max_cluster = int(spike_assignment.max())
+
+    if max_cluster > max_cluster_warn:
+        warnings.warn(
+            "Cluster assignments exceed the max allowed (%d) -- might not be "
+            "compatible with Tint." % max_cluster_warn
+        )
+
+    full_path = os.path.join(dir_path, "%s_%d.cut" % (file_stem, tetrode_no))
+    with open(full_path, "w", newline="") as fh:
+        fh.write("n_clusters: %d\r\n" % (max_cluster + 1))
+        fh.write("n_channels: 4\r\n")
+        fh.write("n_params: 2\r\n")
+        fh.write("times_used_in_Vt:   15   12   12   16\r\n")
+        for n in range(max_cluster + 1):
+            fh.write(" cluster: %2d centre:    0    0    0    0    0    0    0    0\r\n" % n)
+            fh.write("                min:    0    0    0    0    0    0    0    0\r\n")
+            fh.write("                max:    256  256  256  256  256  256  256  256\r\n")
+        fh.write("\r\n")
+
+        fh.write("Exact_cut_for: %s spikes: %6d\r\n" % (file_stem, n_spikes))
+
+        # Body: rows of 25 space-padded cluster ids, then any remaining tail
+        # written with no full row and (matching the original exactly) no
+        # trailing line terminator after the very last value.
+        n_full_rows = max(0, -(-n_spikes // 25) - 1)  # ceil(n_spikes / 25) - 1
+        for row in range(n_full_rows):
+            chunk = spike_assignment[row * 25: row * 25 + 25]
+            fh.write("".join("  %d" % v for v in chunk) + "\r\n")
+        tail = spike_assignment[n_full_rows * 25:]
+        fh.write("".join("  %d" % v for v in tail))
+
+    return full_path
 
 
 def _tetrodes_in_use(settings):

@@ -12,7 +12,7 @@ consume. Typical use::
 """
 
 from .core.recording import Electrode, Recording
-from .io.axona import load_dacq
+from .io.axona import load_dacq, read_inp, read_stm, write_cut
 from .analysis._stats import nan_corr
 from .analysis.decoding import (
     bayesian_posterior,
@@ -56,6 +56,9 @@ __all__ = [
     "Recording",
     "Electrode",
     "load_dacq",
+    "read_inp",
+    "read_stm",
+    "write_cut",
     "rate_map",
     "occupancy_map",
     "spike_map",
