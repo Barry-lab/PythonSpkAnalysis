@@ -53,12 +53,14 @@ analysis. Ships the small shared bits everything else reuses.
 `circular_mean`, `directional_kldiv` (+ KL via scipy), `directional_fft`, `led2v1_dir_offset`, and the
 `pxd`/`histnd`/`wrapper_pxd` unit are all shipped in `analysis/direction.py` and `analysis/pxd.py`.
 
-**v0.4 — Population decoding, replay & circular–linear regression. STATUS: decoding core + phase precession DONE; lineTraj_* deferred.**
+**v0.4 — Population decoding, replay & circular–linear regression. STATUS: DONE.**
 Bayesian decoder trio (`decode_calcPost`, `decode_getSpkCnt`, `decode_processPost`),
-`decode_calcBayesPost`, the `lineTraj_*` group (strong shipped oracle `pMat_data.mat`), the
-Recording-level `crunch_decode` orchestrator, and `circ_regress_cb` (phase-precession circular–linear
-regression — infra-free, built-in Fisher B.20 oracle). No infra; grouped because it is the biggest
-concentration of column-major/1-based index risk and shares validation discipline.
+`decode_calcBayesPost`, the `lineTraj_*` group (validated via the shipped `pMat_data.mat` oracle —
+round-trip self-consistency across 118/230 real replay events, no MATLAB runtime available to compare
+literal reference numbers, see `FINDINGS.md` §13), the Recording-level `crunch_decode` orchestrator,
+and `circ_regress_cb` (phase-precession circular–linear regression — infra-free, built-in Fisher B.20
+oracle). No infra; grouped because it is the biggest concentration of column-major/1-based index risk
+and shares validation discipline.
 
 **v0.5 — Grid extras: elliptical correction (DONE), 2D-FFT, cross-SAC, expanding gridness.**
 `gridEllipse_fit`, `regularise_elliptic_sac` (single copy), `xSacProps`, the 2D-FFT subpackage
@@ -173,11 +175,11 @@ collapse via `label`+`center_of_mass`; `imrotate` is CCW-positive vs scipy `rota
 | `decode_processPost` | `decoding.py::decode_ml` | A (+bin index) | no | GF (avoid ties) | core |
 | `decode_calcBayesPost` | `decoding.py::bayesian_posterior_with_prior` | A | no | GF (unique maxima) | useful |
 | `decode_crunchData` | `decoding.py::crunch_decode` (rewrite around Recording) | R | no | end-to-end approx | useful |
-| `lineTraj_get_res` | `line_trajectory.py::line_residual` | A | no | MAT | useful |
-| `lineTraj_define_line` | `line_trajectory.py::_define_line` | A | no | STRUCT (via decode) | useful |
-| `lineTraj_reget_lnBnd` | `line_trajectory.py::_reget_line_band` | A | no | MAT roundtrip | useful |
-| `lineTraj_decode` | `line_trajectory.py::best_line` | A | no | MAT (`pMat_data.mat`) | useful |
-| `lineTraj_testScript` | → convert to pytest roundtrip | — | — | — | **skip (script)** |
+| `lineTraj_get_res` | `line_trajectory.py::line_residual` | A | no | MAT roundtrip | **DONE** |
+| `lineTraj_define_line` | `line_trajectory.py::_define_line` | A | no | STRUCT (via decode) | **DONE** |
+| `lineTraj_reget_lnBnd` | `line_trajectory.py::reget_line_band` | A | no | MAT roundtrip | **DONE** |
+| `lineTraj_decode` | `line_trajectory.py::best_line` | A | no | MAT (`pMat_data.mat`, 118/230 events round-trip to 1e-15; no MATLAB runtime to compare literal reference values, see `FINDINGS.md` §13) | **DONE** |
+| `lineTraj_testScript` | → converted to pytest roundtrip (`tests/test_line_trajectory.py`) | — | — | — | **DONE** |
 | `*.m~` backups | — | — | — | — | **skip (editor backups)** |
 
 Biggest risk (whole module): column-major flatten + 1-based `ind2sub`/`sub2ind` in every ML-decode and

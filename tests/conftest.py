@@ -45,3 +45,12 @@ def golden_mat():
         pytest.skip("golden .mat not available")
     sio = pytest.importorskip("scipy.io")
     return sio.loadmat(path, squeeze_me=True, struct_as_record=False)
+
+
+@pytest.fixture(scope="session")
+def pmat_data():
+    path = "/Users/caswell/Documents/Git/Universal_Matlab/Decoding/pMat_data.mat"
+    if not os.path.exists(path):
+        pytest.skip("pMat_data.mat not available")
+    sio = pytest.importorskip("scipy.io")
+    return sio.loadmat(path)["t2POS_popVect_pMat"]

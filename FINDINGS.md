@@ -482,9 +482,70 @@ HEAD..origin/master` check on `Universal_Matlab` before trusting it as the
 current ground truth, especially before porting a function whose file has
 seen no local activity in a while.
 
-## 13. Things confirmed correct and bit-exact
+## 13. Line-trajectory replay scoring (`lineTraj_*`), v0.4 (deferred piece)
+
+Ported the previously-deferred `lineTraj_*` group (`analysis/line_trajectory.py`):
+`best_line` (`lineTraj_decode.m`), `reget_line_band` (`lineTraj_reget_lnBnd.m`),
+`line_residual` (`lineTraj_get_res.m`). Finds the best constant-speed straight
+line through a decoded posterior matrix (space x time) — used to score
+candidate replay trajectories.
+
+**Biggest risk was `filter2`/`conv2`/the inline `il_filter2` kernel
+anchoring**, flagged in advance in `PORTING_PLAN.md`. Verified the two
+translations numerically against a brute-force reimplementation *before*
+writing the port (not just assumed from the MATLAB docs' stated equivalence):
+`il_filter2(a,b) = conv2(b, rot90(a,2), 'valid')` translates to
+`scipy.signal.convolve2d(b, np.rot90(a,2), mode='valid')`; and
+`filter2(kern, X)` with a symmetric all-ones column kernel in `'same'` mode
+(used for the line's band) is exactly a rolling sum along axis 0, i.e.
+`scipy.ndimage.convolve1d(X, np.ones(k), axis=0, mode='constant', cval=0.0)`.
+Both matched a brute-force loop implementation exactly.
+
+**No MATLAB runtime available on this machine**, so unlike every other ported
+function so far there's no way to generate independent reference numbers from
+the shipped `Decoding/pMat_data.mat` fixture to compare against. Used the
+oracle `lineTraj_testScript.m` itself relies on instead: rebuilding the best
+line's band from its own reported gradient/intercept
+(`reget_line_band`) and rescoring it against the pMat (`line_residual`) must
+reproduce the original residual exactly. Ran this across all 230 events in
+`pMat_data.mat` (118 yield a fit; the other 112 have no valid data bins, per
+the fixture's own `READ ME.txt` extraction recipe) — all 118 round-trip to
+within 1e-15 (float64 machine precision). A bug in any of the three functions,
+or in the shared offset/index arithmetic between them, would very likely have
+broken this, so it's a strong (if not literally MATLAB-comparative) check.
+**This is a validation gap worth closing if anyone has MATLAB access:** run
+`lineTraj_testScript.m` on `pMat_data.mat` and compare the printed `bstRes`
+values event-by-event against this port's `best_line(...)[0]`.
+
+**A genuine MATLAB quirk found and faithfully replicated (not fixed):**
+`lineTraj_decode.m`'s own comment says "if there is no data... bestRes will
+be 0", and it has an explicit `if bstRes == 0` branch meant to null out
+`bstSpd`/`bstYInterc`/`bstTstLnBnd` to `nan` for that case. But for a
+literally all-zero `pMat`, `bstRes` is computed as `0/sum(pMat) = 0/0`, which
+under IEEE 754 is `NaN`, not `0` — so the `== 0` check silently never fires
+for the very case the comment describes. `bstRes` still ends up `NaN` (any
+caller checking `isnan(bstRes)` behaves correctly), but `bstSpd`/`bstYInterc`
+are left as whatever the first (arbitrarily tied) candidate gradient happened
+to be, rather than also being `nan`. Reproduced exactly in `best_line`
+(`line_trajectory.py`), pinned by
+`test_best_line_all_zero_pmat_leaves_spd_uninitialised_nan_quirk`. Mostly
+dormant in practice since real callers (e.g. the shipped test script) already
+filter out all-zero/no-data pMats via `bins2use` before calling
+`lineTraj_decode` at all.
+
+`min(bins2use):max(bins2use)` in `pMat_data.mat READ ME.txt`'s own extraction
+recipe (also used by `lineTraj_testScript.m`) can include *interior* NaN/zero
+columns between the first and last valid one — not just the contiguous outer
+trim it might look like. `line_trajectory.best_line`/`line_residual` already
+zero out NaNs before use, matching how the MATLAB script's own next line
+(`pMat(isnan(pMat))=0`) handles it, so this is a non-issue, just worth noting
+for anyone assuming `bins2use` selects a fully-valid contiguous block.
+
+## 14. Things confirmed correct and bit-exact
 
 `.pos`/tetrode/`.cut` binary readers (big-endian, 216-byte spikes, 20-byte pos
 records); LED swap + speed filtering; NaN interpolation; 20-tap boxcar position
 smoothing (scipy `origin=0` matches MATLAB `imfilter`); `timestamp/timebase`;
 1-based→0-based `pos_sample`; cluster selection; and `histnd` spatial binning.
+Line-trajectory best-fit-line round-trip self-consistency (118/118 real replay
+events from `pMat_data.mat`, see §13).

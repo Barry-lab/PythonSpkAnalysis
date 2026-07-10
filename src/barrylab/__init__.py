@@ -39,6 +39,7 @@ from .analysis.grid import (
 )
 from .analysis.grid_ellipse import fit_grid_ellipse, regularise_elliptic_sac
 from .analysis.lfp import power_spectrum
+from .analysis.line_trajectory import best_line, line_residual, reget_line_band
 from .analysis.maps import occupancy_map, rate_map, smooth_ratemap, spike_map
 from .analysis.phase_precession import circular_linear_regression
 from .analysis.place_fields import field_stats, spatial_coherence, spatial_correlation
@@ -85,4 +86,7 @@ __all__ = [
     "fit_grid_ellipse",
     "regularise_elliptic_sac",
     "power_spectrum",
+    "best_line",
+    "reget_line_band",
+    "line_residual",
 ]

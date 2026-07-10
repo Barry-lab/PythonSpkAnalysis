@@ -53,7 +53,9 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `decode_calcBayesPost.m` | `bayesian_posterior_with_prior(...)` | public — full Bayes + movement prior |
 | `decode_crunchData.m` | `crunch_decode(recording, cells, ...)` | public — Recording-level orchestrator (redesign, not bit-exact) |
 | `circ_regress_cb.m` | `circular_linear_regression(x, t, k, pp_dir)` | public — phase precession fit |
-| `lineTraj_*` | — | **not yet ported** (`PORTING_PLAN.md` v0.4, deferred) |
+| `lineTraj_decode.m` | `line_trajectory.best_line(pmat, t_bin_sz, s_bin_sz, y_range)` | public — best-fit replay trajectory |
+| `lineTraj_reget_lnBnd.m` | `line_trajectory.reget_line_band(...)` | public — rebuild a line-band mask for another pMat |
+| `lineTraj_get_res.m` | `line_trajectory.line_residual(pmat, line_band)` | public — score a line-band mask against a pMat |
 | `gridEllipse_fit.m` | `fit_grid_ellipse(sac)` | public — ellipse fit to 6 central peaks |
 | `gridEllipse_correct.m` / `regularise_eliptic_grid.m` | `regularise_elliptic_sac(sac, ab_scale, orient_deg)` | public — de-ellipse a SAC |
 | `read_eeg_file.m` | `io.axona._read_eeg` | internal — 250Hz .eeg reader |
