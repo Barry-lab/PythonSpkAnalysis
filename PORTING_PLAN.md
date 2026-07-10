@@ -98,10 +98,13 @@ ported. Two more genuine MATLAB bugs found while reading `fs_masterAnalysis.m`/`
 `data.pos`), plus a real capacity fragility found via real (not just synthetic) non-grid-cell data and
 fixed — see `FINDINGS.md` §18.
 
-**Optional / parallel — extra loaders & viz.**
-`read_INP_file`, `read_stm_file`, `read_KwikRPi`, `write_cut_file`, and a `viz/` layer
-(`image_rm`, `tintColorMap`). Independent of the above; port on demand when the data types / export /
-plotting are actually in scope.
+**Optional / parallel — extra loaders & viz. STATUS: mostly DONE.**
+`read_INP_file` -> `read_inp` DONE, `read_stm_file` -> `read_stm` DONE, `write_cut_file` ->
+`write_cut` DONE (2 genuine MATLAB bugs found and fixed, see `FINDINGS.md` §22). `read_KwikRPi`
+DEFERRED (no sample Kwik data anywhere to validate against, plus a confirmed infinite-loop bug in
+its own `eeg`-loading branch — see `FINDINGS.md` §22). `viz/` layer (`image_rm` -> `viz/plots.py`,
+`tintColorMap` -> `viz/colormaps.py::TINT_CMAP`) DONE — see `FINDINGS.md` §23. `sacProps90deg` ->
+`grid.py::square_grid_props` DONE — see `FINDINGS.md` §24.
 
 ---
 
@@ -174,7 +177,7 @@ vector (docstring says mean — averaging line is commented out); preserve, expo
 | `gridEllipse_correct` | `grid_ellipse.py::regularise_elliptic_sac` | A | no | GF | useful |
 | `regularise_eliptic_grid` | *(byte-identical dup)* alias to above | A | no | — | **skip (dup)** |
 | `brandonRegEcc` | `grid_ellipse.py::brandon_regularise` | A | no | SYN (regular-hex algebraic identity + structural; see `FINDINGS.md`) | **DONE** |
-| `sacProps90deg` | `grid.py::square_grid_props` (or `symmetry=4` flag) | A | no | GF+STRUCT | niche |
+| `sacProps90deg` | `grid.py::square_grid_props` | A | no | STRUCT (synthetic square-lattice fixture) | **DONE** — built almost entirely from already-validated shared helpers (`_sac_peaks` generalised with an `n_closest` param, `_peak_fields`), see `FINDINGS.md` §24 |
 | `xSacProps` | `analysis/grid_phase.py::cross_sac_props` | A | no | SYN (hand-built known-peak fixture, exact match; see `FINDINGS.md` for a likely genuine MATLAB fragility found on realistic input) | **DONE** |
 | `fftVars` | `analysis/spatial_fft.py::FFTParams` (dataclass) | — | no | — | **DONE** |
 | `get_2d_fft` | `spatial_fft.py::power_spectrum_2d` | A | no | SYN (known-frequency grating; DC-removal; max_rad mask; edge-corrected smoothing) | **DONE** |
@@ -221,24 +224,27 @@ reshapes pos contiguously → mis-assigns true position for overlapping windows)
 |---|---|---|---|---|---|
 | `read_eeg_file` | `io/axona.py::_read_eeg` | path | **YES (lfp field)** | GF | core (unblocks theta) |
 | *EGF reader* (no `.m` here) | `io/axona.py::_read_egf` | path | **YES (lfp field)** | GF/STRUCT | useful (write fresh) |
-| `read_INP_file` | `io/axona.py::read_inp` | path | optional (events) | GF if `.inp` present | useful |
-| `read_stm_file` | `io/axona.py::read_stm` | path | optional (events) | GF if `.stm` present | niche |
-| `read_KwikRPi` | `io/kwik.py::load_kwik` (separate loader) | path | **YES (lfp)** + `postprocess_pos_data` | STRUCT (needs Kwik data) | useful/niche |
-| `write_cut_file` | `io/axona.py::write_cut` | A | no | roundtrip vs Tint | useful |
+| `read_INP_file` | `io/axona.py::read_inp` | path | optional (events) | GF if `.inp` present | **DONE** — no `.inp` ships with `Example_data`; validated structurally against a byte-exact synthetic file built from the documented header/record layout, see `FINDINGS.md` §22 |
+| `read_stm_file` | `io/axona.py::read_stm` | path | optional (events) | GF if `.stm` present | **DONE** — no `.stm` ships with `Example_data`; validated structurally, reused the robust `data_start`/`data_end` marker search (like `.egf`) instead of the original's fragile hard-coded 11-line header parsing, see `FINDINGS.md` §22 |
+| `read_KwikRPi` | `io/kwik.py::load_kwik` (separate loader) | path | **YES (lfp)** + `postprocess_pos_data` | STRUCT (needs Kwik data) | **DEFERRED** — no `.kwd`/`.kwx`/`.kwe` sample data anywhere in the repo to validate against (confirmed: none ship with `Example_data`); the source's own `eeg`-loading branch also contains a genuine infinite loop (`while true` with no reachable break for the common case) meaning that code path was likely never run to completion even in MATLAB, and it depends on an unread `default_vars.m` + a `postprocess_pos_data` call signature that doesn't match this port's. Legacy/deprecated OpenEphys format, lowest priority per this phase's brief — see `FINDINGS.md` §22 |
+| `write_cut_file` | `io/axona.py::write_cut` | A | no | roundtrip vs Tint | **DONE** — round-tripped through the already-validated `_read_cut` for small (<25 spikes, exactly the case a second, newly-found MATLAB bug would corrupt), exact-25, and >25-spike (multi-row) cluster-assignment vectors; fixed 2 confirmed MATLAB bugs (the flagged hard-coded `1500728a` literal, plus a newly-found stale-loop-variable bug that silently drops the whole spike-assignment body for <=25-spike cut files), see `FINDINGS.md` §22 |
 | `bin_data` (dir/speed/pxd branches) | `analysis/_binning.py::bin_by_direction/bin_by_speed` (+pxd path) | A | no | GF | core (dir/speed); useful (pxd) |
 | `bin_data` (position branch) | — | — | — | — | **DONE** (occupancy_map/spike_map) |
 | `cb_bin_data` | — deprecation shim | — | — | — | **skip** |
 | `histnd` | `analysis/_binning.py::histnd` | A | no | GF | core (shared; may already be implicit in map ports — check) |
 | `pxd` | `analysis/pxd.py::pxd` | A | no | GF (float-tol) | useful |
 | `easy_make_polarplot` | `direction.py::directional_ratemap` (sugar) | R | no | GF | niche/skip |
-| `image_rm` | `viz/plots.py::image_rm` | A | no | — | niche (viz) |
-| `tintColorMap` | `viz/colormaps.py::TINT_CMAP` (constant) | — | no | — | niche (viz) |
+| `image_rm` | `viz/plots.py::image_rm` | A | no | — | **DONE** (niche/viz — validated by "runs and produces a sane-looking artifact" only, no numerical ground truth for a plotting fn) |
+| `tintColorMap` | `viz/colormaps.py::TINT_CMAP` (constant) | — | no | — | **DONE** — a `matplotlib.colors.ListedColormap` of the literal 5 RGB triplets |
 | `get_true_PPM_boundingBox` | `spatial.py::true_ppm_bounding_box` | A | no | GF | useful |
 | `nan_corr` | `analysis/_stats.py::nan_corr` | A | no | SYN+GF | core (shared util) |
 
-Bugs to fix: `write_cut_file` hard-coded `Exact_cut_for: 1500728a` literal (ignore `fileStem`);
+Bugs: `write_cut_file` hard-coded `Exact_cut_for: 1500728a` literal (ignore `fileStem`) — **fixed**
+in `write_cut`, plus a second, newly-found stale-loop-variable bug that silently drops the whole
+spike-assignment body for <=25-spike cut files — also **fixed**, see `FINDINGS.md` §22.
 `bin_data` pxd `/50` should use `sample_rate` + `nargoout` typo; `read_KwikRPi` EEG-channel `while true`
-loop logic + `strcmp('eeg',varargin)` (string-vs-cell) option detection.
+loop logic (confirmed a genuine infinite loop, not just "logic" — see `FINDINGS.md` §22) +
+`strcmp('eeg',varargin)` (string-vs-cell) option detection — **deferred**, no sample data to validate against.
 
 ---
 
@@ -295,7 +301,7 @@ loop logic + `strcmp('eeg',varargin)` (string-vs-cell) option detection.
   superseded by ported `load_dacq`). `.mat`/`.zip`/RatPaths are data, not code (but usable as fixtures).
 - **`lineTraj_testScript.m`** — convert to a pytest roundtrip against `pMat_data.mat`; don't port.
 - **`*.m~`** (`decoded_getSpkCnt.m~`, `decoded_getSpkCntPerWindow.m~`) — editor backups; ignore.
-- **`image_rm.m` / `tintColorMap.m`** — plotting; defer to a `viz/` layer, not analysis.
+- **`image_rm.m` / `tintColorMap.m`** — plotting; **DONE**, ported to a `viz/` layer (`src/barrylab/viz/plots.py`, `colormaps.py`), not `analysis/` — see `FINDINGS.md` §23.
 
 ---
 

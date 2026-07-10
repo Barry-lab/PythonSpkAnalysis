@@ -77,6 +77,9 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `fs_shufFields.m` | `field_shuffle.shuffle_fields(shape, field_bin_loc, static_bin, rng=...)` | public — involves genuine randomness, see docstring/`FINDINGS.md` |
 | `fs_masterAnalysis.m` | `field_shuffle.field_shuffle_significance(recording, electrode, cluster, ...)` | public — Recording-level redesign like `crunch_decode`, not bit-exact |
 | `identify_grid_cell.m` | `field_shuffle.is_grid_cell(recording, electrode, cluster, ...)` | public — see docstring/`FINDINGS.md` for 2 genuine MATLAB bugs found, not reproduced |
+| `read_INP_file.m` | `io.axona.read_inp(path)` | public — digital-timestamp (button/DIO) events; validated structurally, no example `.inp` ships with `Example_data` |
+| `read_stm_file.m` | `io.axona.read_stm(path)` | public — stimulator-timestamp events; validated structurally, no example `.stm` ships with `Example_data` |
+| `write_cut_file.m` | `io.axona.write_cut(spike_assignment, dir_path, file_stem, tetrode_no)` | public — writes a Tint-compatible `.cut`; fixes 2 genuine MATLAB bugs, see `FINDINGS.md` |
 
 Everything marked *internal* runs inside `load_dacq`; you do not call it directly,
 but it is exposed for validation and testing.
