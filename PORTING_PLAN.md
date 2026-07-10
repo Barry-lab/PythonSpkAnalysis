@@ -82,10 +82,14 @@ significance test). Niche `sacProps90deg` only if square-grid analysis is wanted
 `eeg_instant_freq_power`, `eeg_power_spectra`, `detect_ripples` (ripples require `.egf`). This is the
 only phase blocked on new infra; everything above is independent of it.
 
-**v0.7 — Watershed-gated FieldShuffle. STATUS: segmentation (watershed_fields, field_bin_locations) DONE;
-fs_shufFields DONE (field_shuffle.py::shuffle_fields — genuine per-call randomness, validated
-structurally only, see FINDINGS.md); fs_masterAnalysis/identify_grid_cell orchestration in progress.**
-`fs_fixWatershed`, `fs_binMembLoc`, `fs_shufFields`, `fs_masterAnalysis`, `identify_grid_cell`.
+**v0.7 — Watershed-gated FieldShuffle. STATUS: DONE.** Segmentation (`watershed_fields`,
+`field_bin_locations`), `fs_shufFields` (`shuffle_fields` — genuine per-call randomness, validated
+structurally only), and the `fs_masterAnalysis`/`identify_grid_cell` orchestration
+(`field_shuffle_significance`/`is_grid_cell`, Recording-level redesigns like `crunch_decode`) are all
+ported. Two more genuine MATLAB bugs found while reading `fs_masterAnalysis.m`/`identify_grid_cell.m`
+(a `rotSpkPos` wraparound variable mix-up, and `identify_grid_cell.m` referencing an undefined
+`data.pos`), plus a real capacity fragility found via real (not just synthetic) non-grid-cell data and
+fixed — see `FINDINGS.md` §18.
 
 **Optional / parallel — extra loaders & viz.**
 `read_INP_file`, `read_stm_file`, `read_KwikRPi`, `write_cut_file`, and a `viz/` layer
@@ -164,8 +168,8 @@ vector (docstring says mean — averaging line is commented out); preserve, expo
 | `fs_fixWatershed` | `analysis/field_shuffle.py::_fix_watershed` | A | **watershed** | STRUCT | **DONE** |
 | `fs_binMembLoc` | `field_shuffle.py::field_bin_locations` | A | no | GF | **DONE** |
 | `fs_shufFields` | `field_shuffle.py::shuffle_fields` | A | **watershed** | STRUCT (permutation validity, static-bin preservation, compactness-preservation; no bit-exact comparison possible — genuine per-call randomness, see `FINDINGS.md`) | **DONE** |
-| `fs_masterAnalysis` | `field_shuffle.py::field_shuffle_significance` | R | **watershed** | STRUCT + real-cell | in progress |
-| `identify_grid_cell` | `field_shuffle.py::is_grid_cell` | R | **watershed** | STRUCT | in progress |
+| `fs_masterAnalysis` | `field_shuffle.py::field_shuffle_significance` | R | **watershed** | STRUCT + real 4-cell (grid & non-grid) | **DONE** |
+| `identify_grid_cell` | `field_shuffle.py::is_grid_cell` | R | **watershed** | STRUCT + real 4-cell (grid & non-grid) | **DONE** |
 | `fs_findFields`, `main`, `wraper_scale_range`, `genSynData_*`, `interpRes_*`, `testRealData_*` | — | — | — | — | **skip** (drivers/scripts/superseded — see §5) |
 
 Cross-cutting MATLAB-isms (whole module): `imregionalmax`→`ndimage.maximum_filter(x,3)==x` + plateau

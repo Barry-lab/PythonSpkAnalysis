@@ -797,7 +797,105 @@ distance from a field's own bins to its own new centre is well under half
 the map's diagonal, on a synthetic two-field case). Also runs end-to-end
 without error on the real, watershed-segmented r1838 grid cell.
 
-## 18. Things confirmed correct and bit-exact
+## 18. `fs_masterAnalysis.m`/`identify_grid_cell.m` -> `field_shuffle_significance`/`is_grid_cell`, v0.7 done — two more genuine MATLAB bugs, plus a real capacity fragility discovered on real data
+
+Ported the last of the FieldShuffle orchestration: `field_shuffle_significance`
+(`fs_masterAnalysis.m`) and `is_grid_cell` (`identify_grid_cell.m`), both
+redesigned around `Recording` like `crunch_decode` (validate the component
+functions individually — `fast_gridness`, `brandon_regularise`,
+`shuffle_fields` — this end-to-end orchestrator is not bit-exact, and
+inherits `shuffle_fields`' genuine per-call randomness on top). Also added
+the small `_brandon_gridness` helper (port of the `sf_getBrandonG`
+subfunction embedded in `fs_masterAnalysis.m`: best-of-two-methods
+Brandon-corrected gridness, using `np.fmax` rather than `max()`/
+`np.maximum` to match MATLAB `max()`'s NaN-ignoring semantics — the same
+recurring MATLAB-vs-numpy NaN gotcha hit several times elsewhere in this
+project).
+
+**Two further genuine MATLAB bugs found by reading the source directly**
+(per the standing "watch for bugs in the original" instruction), neither
+reproduced — both make more sense to route around than to faithfully
+replicate, for reasons specific to each:
+
+1. **`fs_masterAnalysis.m`'s temporal-shuffle wraparound assigns the wrong
+   variable.** `rotSpkPos=mod(spkPos+rotAmnt,trlLgthPosSamp);
+   rotSpkPos(rotSpkPos==0)=nLpForShuf;` — MATLAB is 1-based, so a
+   mod-wrapped result of exactly `0` is invalid and should remap to the
+   *last* valid index, `trlLgthPosSamp` (the trial length). Instead it
+   substitutes `nLpForShuf` — the number of shuffle *iterations* (typically
+   100), an unrelated quantity — silently placing a small number of rotated
+   spikes near the very start of the trial instead of wrapping correctly.
+   **Not reproduced, and not really "fixable" as a faithful port either:**
+   in 0-based Python indexing this whole workaround is moot, since `0` is
+   already a perfectly valid index — `(spk_idx + rotation) % n_pos` is used
+   directly with no special case, which sidesteps the bug's relevance
+   entirely rather than needing to decide whether to replicate it.
+2. **`identify_grid_cell.m` references an undefined variable.** It calls
+   `fs_masterAnalysis(data.pos, spkPos, ...)`, but the function's own
+   parameter is named `pos`, not `data.pos` — `data` is never defined
+   anywhere in the function. This would raise "undefined variable" in
+   MATLAB on every single invocation, meaning `identify_grid_cell.m` was
+   very likely never actually run as a standalone function call (only
+   possibly ever exercised by pasting its body into a script/workspace
+   context where a variable happened to be named `data`). There is no
+   well-defined numerical behaviour here to preserve — only a guaranteed
+   crash — so `is_grid_cell` simply calls `field_shuffle_significance` with
+   the actual `recording` argument, as any correct implementation must.
+
+**A significant capacity fragility found and fixed, discovered only because
+real (not just synthetic) data was tried in addition to synthetic
+fixtures.** Running the new `is_grid_cell` across all four documented
+example cells (t2c1, t2c3 = grid; t2c4, t2c5 = non-grid), the two grid
+cells worked immediately but t2c4 (non-grid) deterministically raised
+`shuffle_fields`'s "ran out of available destination bins" error on
+**every one of 30 different seeds tried** — not a rare, unlucky draw.
+Root-caused by direct inspection of the field-segmentation numbers (not
+assumed): unmarked watershed always tiles the *entire* ratemap into
+catchment basins, including never-visited regions, and t2c4 happens to have
+a tiny, marginal field whose single highest-rate bin is itself an unvisited
+(static) bin. Both MATLAB's `fs_shufFields.m` and a literal translation of
+it are vulnerable to this: every field's peak gets relocated to a brand-new
+slot from the movable-bin pool regardless of whether that peak coincides
+with a bin flagged static (nothing in `fs_binMembLoc.m`/
+`field_bin_locations` checks for this), so a static-coincident peak
+consumes a slot from supply while contributing nothing to declared demand —
+deterministically over-constraining the allocation by exactly one slot.
+Confirmed by direct arithmetic on the real data: demand exceeded supply by
+exactly 1 for t2c4's segmentation, matching the "always fails" empirical
+result exactly. **Fixed in `shuffle_fields`** (not merely documented, since
+this is squarely the kind of correctness issue worth resolving rather than
+faithfully reproducing MATLAB's silent-corruption fallback): a field whose
+peak is itself a static bin is now treated as entirely static (all its bins
+stay in place) rather than relocated — sensible on its own terms too, since
+such a "field" is watershed noise from a never-visited area, not a genuine
+firing field. Confirmed this resolves the concrete case (30/30 seeds
+succeed on t2c4 afterward) and added a second, purely defensive
+`ValueError` for a distinct (and, after this fix, essentially
+unreachable-via-self-consistent-input) failure mode: more genuine fields
+than movable bins to give them new centres. Full detail, including the
+worked arithmetic, in `field_shuffle.py::shuffle_fields`'s docstring.
+
+This is a good illustration of why real, non-grid, "should fail the test"
+cells are worth deliberately including in validation, not just the
+documented positive (grid-cell) examples — the fragility here specifically
+affects sparse/patchy-firing cells, exactly the population `identify_grid_cell`
+exists to correctly classify as non-grid, and would have gone undetected
+testing only the two grid cells.
+
+**Validation.** Structural, as for the rest of the FieldShuffle chain (no
+MATLAB runtime, plus genuine randomness in the field-shuffle step means
+bit-exact comparison is impossible regardless): `field_shuffle_significance`
+runs end-to-end on the real example trial and its standard/expanding
+gridness for the "no correction" case matches `fast_gridness` called
+directly on the same ratemap exactly (a strong internal-consistency check,
+since both paths independently build the same ratemap and call the same
+gridness function); `_brandon_gridness` matches an independently-computed
+best-of-both-methods calculation exactly; `is_grid_cell` runs cleanly and
+returns correctly-shaped output across all four documented example cells
+(both grid and non-grid) with multiple shuffle counts and seeds, including
+the t2c4 case that specifically exercised the capacity-fragility fix above.
+
+## 19. Things confirmed correct and bit-exact
 
 `.pos`/tetrode/`.cut` binary readers (big-endian, 216-byte spikes, 20-byte pos
 records); LED swap + speed filtering; NaN interpolation; 20-tap boxcar position

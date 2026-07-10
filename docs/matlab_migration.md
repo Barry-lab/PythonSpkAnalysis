@@ -71,7 +71,8 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `fs_masterAnalysis.m` watershed step + `fs_fixWatershed.m` | `field_shuffle.watershed_fields(rate_map, occupancy)` | public — needs `barrylab[fieldshuffle]` |
 | `fs_binMembLoc.m` | `field_shuffle.field_bin_locations(labels, rate_map)` | public — needs `barrylab[fieldshuffle]` |
 | `fs_shufFields.m` | `field_shuffle.shuffle_fields(shape, field_bin_loc, static_bin, rng=...)` | public — involves genuine randomness, see docstring/`FINDINGS.md` |
-| `fs_masterAnalysis.m`/`identify_grid_cell.m` orchestration | — | **not yet ported** (`PORTING_PLAN.md` v0.7, in progress) |
+| `fs_masterAnalysis.m` | `field_shuffle.field_shuffle_significance(recording, electrode, cluster, ...)` | public — Recording-level redesign like `crunch_decode`, not bit-exact |
+| `identify_grid_cell.m` | `field_shuffle.is_grid_cell(recording, electrode, cluster, ...)` | public — see docstring/`FINDINGS.md` for 2 genuine MATLAB bugs found, not reproduced |
 | 2-D FFT grid analysis, cross-SAC | — | **not yet ported** (`PORTING_PLAN.md` v0.5) |
 
 Everything marked *internal* runs inside `load_dacq`; you do not call it directly,

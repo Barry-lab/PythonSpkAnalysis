@@ -9,13 +9,11 @@ Ports the whole of ``FieldShuffle/``:
 - :func:`shuffle_fields` — randomly reallocate field centres and their
   member bins while preserving each field's internal shape as closely as
   possible (``fs_shufFields.m``).
-- :func:`fast_gridness_with_brandon` — the four gridness measures
-  ``fs_masterAnalysis.m`` computes per (real or shuffled) ratemap: standard
-  and expanding, each with and without Brandon-method ellipse correction.
 - :func:`field_shuffle_significance` — the Recording-level orchestration
   (``fs_masterAnalysis.m``): builds a ratemap, gets its four gridness
-  measures, then compares them against ``n_shuffles`` iterations each of a
-  temporal shuffle and this module's field shuffle.
+  measures (standard/expanding, each with and without Brandon-method
+  ellipse correction), then compares them against ``n_shuffles`` iterations
+  each of a temporal shuffle and this module's field shuffle.
 - :func:`is_grid_cell` — compare a cell's gridness against its own shuffle
   distributions at a given percentile (``identify_grid_cell.m``).
 
@@ -26,8 +24,9 @@ import numpy as np
 from scipy.ndimage import label
 from skimage.segmentation import watershed
 
-from .grid import cross_correlogram, fast_gridness
+from .grid import fast_gridness, spatial_autocorrelogram
 from .grid_ellipse import brandon_regularise
+from .maps import occupancy_map, smooth_ratemap, spike_map
 
 
 def _fix_watershed(rate_map, labels):
@@ -179,6 +178,27 @@ def shuffle_fields(rate_map_shape, field_bin_loc, static_bin, rng=None):
        1-based column-major linear indices, which would only add translation
        risk for zero validation benefit. See ``FINDINGS.md``.
 
+       A field whose *peak* bin is itself in ``static_bin`` is treated as
+       entirely static (none of its bins move) rather than relocated like a
+       normal field. Unmarked watershed always tiles the *entire* ratemap
+       into catchment basins, including never-visited regions -- a field
+       whose single highest-rate bin happens to be one of those unvisited
+       bins is a watershed artefact of a never-visited area, not a genuine
+       firing field, and both MATLAB and a literal translation of it are
+       vulnerable to a real, not-contrived capacity mismatch if it's
+       relocated anyway: that field's peak would still consume a slot from
+       the movable-bin pool via random reallocation (nothing in
+       ``fs_binMembLoc.m``/:func:`field_bin_locations` checks whether a
+       peak coincides with an unvisited bin) while contributing nothing back
+       to supply, since it was excluded from ``static_bin`` accounting on
+       the demand side. Confirmed via real data (the shipped example
+       trial's non-grid cell t2c4 has exactly this: a tiny field whose peak
+       sits on an unvisited bin, deterministically over-constraining the
+       allocation by exactly one slot on every seed tried) that this is a
+       likely, not rare, occurrence for cells with sparse/patchy firing --
+       exactly the kind of cell this whole function exists to correctly
+       call non-grid. See ``FINDINGS.md``.
+
     Parameters
     ----------
     rate_map_shape : (int, int)
@@ -204,12 +224,46 @@ def shuffle_fields(rate_map_shape, field_bin_loc, static_bin, rng=None):
     rng = _as_random_state(rng)
     ny, nx = rate_map_shape
     n_total = ny * nx
-    n_field = len(field_bin_loc)
 
     static_bin = np.asarray(static_bin, dtype=np.int64).ravel()
+
+    # A field whose own peak is a static bin is a watershed artefact of a
+    # never-visited region, not a genuine field -- exclude it entirely
+    # (every one of its bins joins the static set) rather than relocate it.
+    # See the docstring note above for why this matters for feasibility.
+    static_set = set(static_bin.tolist())
+    genuine_fields, extra_static = [], []
+    for fld in field_bin_loc:
+        peak_r, peak_c = fld["peak_index"]
+        if (peak_r * nx + peak_c) in static_set:
+            extra_static.append(peak_r * nx + peak_c)
+            extra_static.extend(r * nx + c for r, c in fld["other_indices"])
+        else:
+            genuine_fields.append(fld)
+    if extra_static:
+        static_bin = np.union1d(static_bin, np.array(extra_static, dtype=np.int64))
+    field_bin_loc = genuine_fields
+    n_field = len(field_bin_loc)
+
     all_bins = np.arange(n_total)
     bin_to_move = np.setdiff1d(all_bins, static_bin)
     n_bin = bin_to_move.size
+    if n_bin < n_field:
+        # Should not be reachable via any self-consistent (field_bin_loc,
+        # static_bin) pair post-exclusion above: a genuine field's peak is
+        # never static by definition (that's exactly what triggers
+        # exclusion), so every genuine field's peak is always itself part of
+        # the movable pool, guaranteeing n_bin >= n_field. Kept as a
+        # defensive guard for a caller passing mismatched/inconsistent data
+        # (e.g. a static_bin from a different occupancy map) -- MATLAB's
+        # fldCentInd(1:nField) would index past the end of a shorter array
+        # and error there too; Python's slicing silently truncates instead,
+        # which would otherwise surface later as a confusing IndexError once
+        # the truncated fld_cent_ind ran out mid-loop.
+        raise ValueError(
+            "shuffle_fields has more genuine fields (%d) than movable bins "
+            "(%d) to give them new centres" % (n_field, n_bin)
+        )
 
     # Random field-processing order -- persists through every subsequent
     # field-indexed step below, matching MATLAB reordering fldBinLoc once
@@ -293,3 +347,213 @@ def shuffle_fields(rate_map_shape, field_bin_loc, static_bin, rng=None):
         bin_ord_by_field[bin_ord_by_field == next_bin] = -1
 
     return shuf_inds.reshape(rate_map_shape)
+
+
+def _brandon_gridness(sac):
+    """Best-of-two-methods Brandon-corrected gridness. Port of the
+    ``sf_getBrandonG`` subfunction embedded in ``fs_masterAnalysis.m``."""
+    rsac1, rsac2 = brandon_regularise(sac)
+    std1, exp1, _ = fast_gridness(rsac1)
+    std2, exp2, _ = fast_gridness(rsac2)
+    # np.fmax (not max()/np.maximum) to match MATLAB max()'s NaN-ignoring
+    # behaviour: if only one method found enough peaks, use that one.
+    return float(np.fmax(std1, std2)), float(np.fmax(exp1, exp2))
+
+
+def field_shuffle_significance(recording, electrode, cluster, bin_cm=2.0, n_shuffles=100,
+                                smooth_kern_size=1.5, smooth_kern_type="gaussian",
+                                min_temporal_rotation_s=30.0, keep_ratemaps=False, rng=None):
+    """Gridness of a cell vs. its own temporal- and field-shuffle distributions.
+
+    A ``Recording``-level redesign of ``fs_masterAnalysis.m`` (like
+    :func:`~barrylab.analysis.decoding.crunch_decode` -- validate the
+    component functions individually; this end-to-end orchestrator is not
+    bit-exact, and its field-shuffle step involves genuine randomness that
+    can never be bit-exact regardless, see :func:`shuffle_fields`).
+
+    For the real cell, builds a ratemap and gets four gridness measures
+    (standard and expanding, each with and without Brandon-method ellipse
+    correction — see :func:`~barrylab.analysis.grid.fast_gridness` and
+    :func:`~barrylab.analysis.grid_ellipse.brandon_regularise`). Then repeats
+    this ``n_shuffles`` times for two null distributions: a **temporal**
+    shuffle (spikes' position-sample indices rotated by a random amount,
+    with at least ``min_temporal_rotation_s`` seconds either side of zero)
+    and a **field** shuffle (:func:`shuffle_fields`, on fields segmented once
+    from the real, Gaussian-smoothed ratemap).
+
+    .. note::
+       The original MATLAB hardcodes a 50 Hz position sample rate in this
+       rotation-range calculation (``trlLgth=trlLgthPosSamp/(50*60)``,
+       ``rotRng=[...]*50``) rather than reading it from the data -- fine for
+       its DACQ-only context (always 50 Hz) but not generalisable. This
+       ``Recording``-based redesign uses ``recording.pos_sample_rate``
+       directly instead, consistent with how ``crunch_decode`` already
+       generalises the same kind of MATLAB DACQ-specific assumption
+       elsewhere in this package.
+
+       Also **does not reproduce** a genuine MATLAB bug found while reading
+       ``fs_masterAnalysis.m``: ``rotSpkPos(rotSpkPos==0)=nLpForShuf`` -- the
+       modulo-wrapped position index 0 should remap to ``trlLgthPosSamp``
+       (MATLAB is 1-based, so 0 is never a valid position index and must
+       wrap to the *last* one), but the code substitutes the unrelated
+       shuffle-iteration count instead, corrupting a small number of spikes
+       per shuffle iteration (whichever land exactly on a multiple of the
+       trial length after rotation). In 0-based Python this whole
+       remapping step is moot -- ``0`` is already a perfectly valid index --
+       so ``(spk_idx + rotation) % n_pos`` is used directly with no special
+       case, sidestepping the bug entirely rather than needing to replicate
+       or explicitly avoid it. See ``FINDINGS.md``.
+
+    Parameters
+    ----------
+    recording : Recording
+    electrode, cluster : int
+    bin_cm : float
+        Spatial bin size in cm for both the ratemap and field segmentation.
+    n_shuffles : int
+        Number of temporal and field shuffle iterations (MATLAB default 100,
+        via ``identify_grid_cell.m``).
+    smooth_kern_size, smooth_kern_type : float, str
+        Smoothing for the *gridness* ratemaps (field segmentation always
+        uses Gaussian smoothing with sigma 3, matching the original's fixed
+        choice for that specific step).
+    min_temporal_rotation_s : float
+        Minimum temporal-shuffle rotation magnitude, in seconds.
+    keep_ratemaps : bool
+        If ``True``, also return every shuffle's ratemap (slower; mirrors
+        MATLAB's ``nargout==5`` conditional via an explicit parameter instead
+        of output-count introspection).
+    rng : int, numpy.random.RandomState, or None
+        Seed or random state.
+
+    Returns
+    -------
+    dict with:
+        ``gridness`` -- ``(4,)`` ``[standard, standard_brandon, expanding,
+            expanding_brandon]`` for the real cell.
+        ``grid_scale`` -- grid scale (bins) of the real cell's SAC.
+        ``p95`` -- ``(4, 2)`` 95th-percentile shuffle threshold, columns
+            ``[temporal, field]``.
+        ``gridness_from_shuffle`` -- ``(4, 2, n_shuffles)`` every shuffle's
+            gridness.
+        ``ratemaps`` -- (only if ``keep_ratemaps``) dict with ``real``,
+            ``temporal_shuffle`` (list), ``field_shuffle`` (list).
+    """
+    rng = _as_random_state(rng)
+    elec = recording.electrode(electrode)
+    spk_idx = elec.spike_pos_index(cluster)
+    n_pos = recording.n_pos
+
+    bin_occ = occupancy_map(recording, bin_cm)
+    bin_spk = spike_map(recording, spk_idx, bin_cm)
+
+    rm, _, _ = smooth_ratemap(bin_occ, bin_spk, smooth_kern_size, smooth_kern_type, "norm")
+    rm_gauss, _, _ = smooth_ratemap(bin_occ, bin_spk, 3.0, "gaussian", "norm")
+
+    sac = spatial_autocorrelogram(rm)
+    std_g, exp_g, grid_scale = fast_gridness(sac)
+    std_bg, exp_bg = _brandon_gridness(sac)
+    grid = np.array([std_g, std_bg, exp_g, exp_bg])
+
+    # --- field segmentation, once, on the real (Gaussian-smoothed) ratemap ---
+    # Matches MATLAB's wsRm(binXY==0)=0 literally: the SAME zeroed array is
+    # used for both watershedding and fs_binMembLoc's peak-finding, not
+    # watershed_fields' own (NaN-based) internal zeroing.
+    unvisited = bin_occ == 0
+    ws_rm = np.where(unvisited, 0.0, rm_gauss)
+    labels = watershed_fields(ws_rm)
+    field_bin_loc = field_bin_locations(labels, ws_rm)
+    static_bin = np.flatnonzero(unvisited.ravel())
+
+    min_rot_samp = int(round(min_temporal_rotation_s * recording.pos_sample_rate))
+    rot_low, rot_high = min_rot_samp, n_pos - min_rot_samp
+
+    grid_from_shuffle = np.zeros((4, 2, n_shuffles))
+    time_rms = [] if keep_ratemaps else None
+    space_rms = [] if keep_ratemaps else None
+
+    for h in range(n_shuffles):
+        # 1) temporal shuffle
+        rot_amount = rng.randint(rot_low, rot_high + 1)
+        rot_spk_idx = (spk_idx + rot_amount) % n_pos
+        bin_spk_rot = spike_map(recording, rot_spk_idx, bin_cm)
+        rm_t, _, _ = smooth_ratemap(bin_occ, bin_spk_rot, smooth_kern_size, smooth_kern_type, "norm")
+        if keep_ratemaps:
+            time_rms.append(rm_t)
+        sac_t = spatial_autocorrelogram(rm_t)
+        t_std, t_exp, _ = fast_gridness(sac_t)
+        t_std_b, t_exp_b = _brandon_gridness(sac_t)
+
+        # 2) field shuffle
+        shuf_inds = shuffle_fields(rm.shape, field_bin_loc, static_bin, rng=rng)
+        flat = shuf_inds.ravel()
+        bin_occ_shuf = bin_occ.ravel()[flat].reshape(rm.shape)
+        bin_spk_shuf = bin_spk.ravel()[flat].reshape(rm.shape)
+        rm_s, _, _ = smooth_ratemap(bin_occ_shuf, bin_spk_shuf, smooth_kern_size, smooth_kern_type, "norm")
+        if keep_ratemaps:
+            space_rms.append(rm_s)
+        sac_s = spatial_autocorrelogram(rm_s)
+        s_std, s_exp, _ = fast_gridness(sac_s)
+        s_std_b, s_exp_b = _brandon_gridness(sac_s)
+
+        grid_from_shuffle[:, 0, h] = [t_std, t_std_b, t_exp, t_exp_b]
+        grid_from_shuffle[:, 1, h] = [s_std, s_std_b, s_exp, s_exp_b]
+
+    p95 = np.nanpercentile(grid_from_shuffle, 95, axis=2)
+
+    result = {
+        "gridness": grid,
+        "grid_scale": grid_scale,
+        "p95": p95,
+        "gridness_from_shuffle": grid_from_shuffle,
+    }
+    if keep_ratemaps:
+        result["ratemaps"] = {"real": rm, "temporal_shuffle": time_rms, "field_shuffle": space_rms}
+    return result
+
+
+def is_grid_cell(recording, electrode, cluster, n_shuffles=100, bin_cm=2.0, rng=None):
+    """Is this cell a grid cell, by comparison to its own shuffle distributions?
+
+    Port of ``identify_grid_cell.m`` (redesigned around ``Recording``, like
+    :func:`field_shuffle_significance`). The original hardcodes its shuffle
+    count (100) and bin size (2 cm) rather than exposing them as arguments;
+    kept as the defaults here but overridable.
+
+    .. note::
+       The original MATLAB calls ``fs_masterAnalysis(data.pos, spkPos, ...)``,
+       referencing an undefined variable ``data`` (the function's own
+       parameter is named ``pos``, not ``data.pos``) -- this would raise
+       "undefined variable" in MATLAB on every single call, meaning
+       ``identify_grid_cell.m`` was very likely never actually run as a
+       standalone function (only ever exercised, if at all, by pasting its
+       body into a script/workspace context where a variable happened to be
+       named ``data``). Not something that can be "faithfully reproduced" --
+       there is no well-defined numerical behaviour to preserve, only a
+       crash -- so this redesign simply calls
+       :func:`field_shuffle_significance` with the actual ``recording``
+       argument. See ``FINDINGS.md``.
+
+    Parameters
+    ----------
+    recording : Recording
+    electrode, cluster : int
+    n_shuffles : int
+    bin_cm : float
+    rng : int, numpy.random.RandomState, or None
+
+    Returns
+    -------
+    dict with:
+        ``is_grid`` -- ``(4, 2)`` bool, rows ``[standard, standard_brandon,
+            expanding, expanding_brandon]``, columns ``[temporal, field]``
+            shuffle -- whether the real cell's gridness exceeds that
+            shuffle's 95th percentile.
+        ``gridness`` -- ``(4,)`` the cell's own gridness values.
+        ``threshold`` -- ``(4, 2)`` the 95th-percentile threshold used.
+    """
+    result = field_shuffle_significance(
+        recording, electrode, cluster, bin_cm=bin_cm, n_shuffles=n_shuffles, rng=rng
+    )
+    is_grid = result["gridness"][:, None] > result["p95"]
+    return {"is_grid": is_grid, "gridness": result["gridness"], "threshold": result["p95"]}
