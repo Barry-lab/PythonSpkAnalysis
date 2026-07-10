@@ -23,7 +23,18 @@ from scipy.special import gamma
 from ._binning import histnd
 from .maps import smooth_ratemap, spike_map
 
-_SMALL_V = np.finfo(float).eps ** 8
+# "Small value" added to expected spike counts to avoid literal zeros (a rate
+# map bin at exactly 0 Hz makes a single observed spike there impossible,
+# i.e. probability 0 -- not useful). decode_calcPost.m and decode_calcBayesPost.m
+# share the identical originating comment for this, but as of the current
+# upstream MATLAB they've DIVERGED: decode_calcPost.m was fixed in 2020
+# (eps^8 -> eps, since eps^8 is so vanishingly tiny it doesn't actually
+# prevent the zero-probability problem the comment describes) but that fix
+# was never propagated to decode_calcBayesPost.m, which still uses the old,
+# ineffective eps^8. Kept as two separate constants matching each function's
+# actual current MATLAB source, rather than one shared value -- see FINDINGS.md.
+_SMALL_V_CALC_POST = np.finfo(float).eps       # decode_calcPost.m (fixed upstream 2020)
+_SMALL_V_BAYES_POST = np.finfo(float).eps ** 8  # decode_calcBayesPost.m (not yet fixed upstream)
 
 
 def _gaussian_kernel_1d(sigma):
@@ -127,7 +138,7 @@ def bayesian_posterior(obs_spk, rate_maps, t_bin, normalise=True):
     if n_cells != rate_maps.shape[2]:
         raise ValueError("number of cells in obs_spk and rate_maps must match")
 
-    expected = (rate_maps + _SMALL_V) * t_bin  # (ny, nx, n_cells)
+    expected = (rate_maps + _SMALL_V_CALC_POST) * t_bin  # (ny, nx, n_cells)
     expon = np.exp(-expected)
     factorial = gamma(obs_spk + 1)  # (n_cells, n_time)
 
@@ -179,7 +190,7 @@ def bayesian_posterior_with_prior(obs_spk, rate_maps, dwell_map, t_bin,
 
     px = dwell_map / np.nansum(dwell_map)
 
-    expected = (rate_maps + _SMALL_V) * t_bin
+    expected = (rate_maps + _SMALL_V_BAYES_POST) * t_bin
     expon = np.exp(-expected)
     working = (expected[:, :, :, None] ** obs_spk[None, None, :, :]) * expon[:, :, :, None]
     post = np.prod(working, axis=2)

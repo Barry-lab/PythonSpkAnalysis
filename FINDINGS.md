@@ -438,7 +438,51 @@ general property of the method itself rather than a port defect, though not
 cross-checked against MATLAB directly; every one of the map's bins accounted
 for in exactly one field).
 
-## 12. Things confirmed correct and bit-exact
+## 12. The local MATLAB clone was stale — a real upstream bug fix found and applied
+
+While adding a note to `Universal_Matlab`'s README linking to this port (see
+its repo), discovered the local clone used for the whole port so far was 7
+commits behind the actual GitHub `master`. Diffed every changed file against
+what's already been ported (`decode_calcPost.m` was the only overlap; the
+other new/changed files — `decode_cosSim.m`, `decode_calcPost_twoPhoton.m`,
+`makeRM_kilosort.m`, `circ_circ_corr.m` extraction, a `default_vars.m`
+directory move — aren't relevant to anything ported yet).
+
+**`decode_calcPost.m` was fixed upstream in 2020** (commit `d12abbc`,
+"changed the min value that is add to prevent values being 0"): the
+zero-avoidance epsilon `smallV` changed from `eps^8` (~4.6e-124 — so
+vanishingly tiny it doesn't actually prevent the zero-probability problem
+its own comment describes, since adding it to a rate map bin leaves the
+bin numerically indistinguishable from exactly 0) to plain `eps`
+(~2.22e-16 — still tiny, but numerically meaningful for its stated purpose).
+Since this is the *author's own* later correction to the gold-standard
+repo, not a discrepancy between my port and some external reference, this
+is a case for actually updating the port (unlike goal-1's "preserve MATLAB
+bugs faithfully" rule, which is about not silently diverging from the
+authoritative implementation — here the authoritative implementation moved,
+and the old value was never the intended one). `bayesian_posterior`'s
+`_SMALL_V_CALC_POST` updated from `eps**8` to `eps` to match.
+
+**A genuine inconsistency in the current MATLAB itself, left as-is.**
+`decode_calcBayesPost.m` has the *identical* originating comment and
+originally-identical `smallV=eps.^8` line as `decode_calcPost.m` — but the
+2020 fix was applied only to `decode_calcPost.m` and never propagated to its
+near-twin. Checked directly against the current upstream file to confirm
+this isn't an artifact of my own stale clone. Since `decode_calcBayesPost.m`
+genuinely still has the old value in the actively-maintained repo,
+`bayesian_posterior_with_prior`'s `_SMALL_V_BAYES_POST` is kept at `eps**8`
+to match its actual current source — the two Python constants are now
+deliberately different, one per MATLAB function, rather than a single shared
+value, because the two MATLAB functions have themselves diverged.
+
+**Practical note for future sessions:** the local MATLAB clone can drift
+behind the real upstream between sessions (this lab's other members/PI
+actively commit to it). Worth an occasional `git fetch && git log
+HEAD..origin/master` check on `Universal_Matlab` before trusting it as the
+current ground truth, especially before porting a function whose file has
+seen no local activity in a while.
+
+## 13. Things confirmed correct and bit-exact
 
 `.pos`/tetrode/`.cut` binary readers (big-endian, 216-byte spikes, 20-byte pos
 records); LED swap + speed filtering; NaN interpolation; 20-tap boxcar position
