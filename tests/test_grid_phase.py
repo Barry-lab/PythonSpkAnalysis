@@ -44,7 +44,7 @@ def test_cross_correlogram_of_a_map_with_itself_matches_autocorrelogram():
 
 
 def test_cross_sac_props_recovers_known_peak_geometry_exactly():
-    n, c = 41, 20
+    n = 41
     xsac, centre, (central_row, central_col), neighbours = _clean_xsac_with_known_peaks(n=n)
 
     props = cross_sac_props(xsac)

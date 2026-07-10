@@ -13,7 +13,6 @@ for validation and testing but are not part of the stable API.
 
 import os
 import warnings
-from typing import Optional
 
 import numpy as np
 

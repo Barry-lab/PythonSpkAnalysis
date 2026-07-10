@@ -120,7 +120,6 @@ def test_decode_maximum_likelihood_zero_error_when_post_matches_true_bin():
 
     ny, nx, bin_px = 5, 5, 10.0
     n_pos = 200
-    rng = np.random.RandomState(2)
     rec = _FakeRecording()
     # place the animal at a fixed known pixel location for every sample
     rec.xy = np.tile([2.5 * bin_px, 3.5 * bin_px], (n_pos, 1))

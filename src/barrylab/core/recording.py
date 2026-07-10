@@ -9,7 +9,7 @@ Kept as a plain, transparent container (arrays + light metadata) so a student
 can inspect every field. It intentionally has no file-format knowledge.
 """
 
-from typing import Dict, Optional
+from typing import Dict
 
 import numpy as np
 

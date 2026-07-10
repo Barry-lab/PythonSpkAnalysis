@@ -21,7 +21,6 @@ Requires the ``scikit-image`` extra (``pip install "barrylab[fieldshuffle]"``).
 """
 
 import numpy as np
-from scipy.ndimage import label
 from skimage.segmentation import watershed
 
 from .grid import fast_gridness, spatial_autocorrelogram
