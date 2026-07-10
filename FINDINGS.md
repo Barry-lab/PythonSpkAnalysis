@@ -258,7 +258,62 @@ comparison.
 `PORTING_PLAN.md`) — deferred to cover more breadth across v0.5/v0.6 given
 time constraints; still on the plan.
 
-## 8. Things confirmed correct and bit-exact
+## 8. Elliptical grid correction, v0.5
+
+Ported `gridEllipse_fit.m` -> `fit_grid_ellipse()` (fits an ellipse to a grid
+cell's six central SAC peaks via least-squares conic fitting — a MathWorks
+File Exchange algorithm embedded as a subfunction in the original, ported
+faithfully as `_fit_ellipse()`) and `gridEllipse_correct.m` ->
+`regularise_elliptic_sac()` (rotates/rescales/rotates-back an elliptical SAC
+toward circular, so gridness can be recomputed on the corrected map;
+`regularise_eliptic_grid.m` is a byte-identical MATLAB duplicate, ported
+once). Reused the existing `grid.py::_sac_peaks` peak-finder rather than
+duplicating it a third time (new code, not a refactor of shipped code).
+
+**A synthetic-test convention puzzle, resolved.** A first synthetic test
+constructed a known ellipse with a standard (CCW) rotation matrix and got the
+correct semi-axes back but the *wrong-signed* orientation. Investigated
+rather than adjusted the test: `gridEllipse_fit.m`'s own plotting subcode
+uses `R = [cos_phi sin_phi; -sin_phi cos_phi]` — the **transpose** of a
+standard CCW rotation matrix — so the algorithm's own internal convention for
+`phi` is CW-flavoured relative to a naive assumption. Reconstructing the
+synthetic test with MATLAB's own `R` convention recovers `a`, `b`, **and**
+`phi` bit-exactly (`atol=1e-6`) — confirming the port is correct and the
+mismatch was purely in the test's assumed convention, not the code.
+
+**A units mismatch inherited from the original, documented rather than
+silently "fixed".** `fit_grid_ellipse()`'s `orientation` is in radians, but
+`regularise_elliptic_sac()`'s `orient_deg` is in degrees — this split exists
+in the MATLAB too (`gridEllipse_fit.m` returns radians; `gridEllipse_correct.m`
+expects degrees; `brandonRegEcc.m` explicitly `rad2deg`-converts when chaining
+them). Kept identical to preserve the exact contract, with an explicit
+docstring note and conversion example so it isn't a silent trap.
+
+**A real off-by-one fixed (new code, not a MATLAB-fidelity issue).**
+`gridEllipse_correct.m`'s final centre-crop (`sizeDif=round(...)`) can land
+one pixel short after an odd rotated-size difference, because MATLAB's
+`round()` rounds half-away-from-zero while a naive numpy port would round
+half-to-even (see finding on `multiGridness.m`'s `innerRadi` for the same
+class of MATLAB/numpy rounding divergence). Since the MATLAB code's own
+comment states its explicit intent ("keep only the central portion... so
+that it matches the original size"), implemented the crop to directly slice
+to the exact target shape rather than replicate the rounding ambiguity —
+this fulfils the code's own documented purpose rather than changing what any
+value means.
+
+**Validation.** `_fit_ellipse` is bit-exact against a known synthetic
+ellipse (using the algorithm's own rotation convention, `atol=1e-6`) and
+correctly recovers a circle (`a==b`) for circularly-arranged points. On real
+r1838 grid cells, `fit_grid_ellipse` returns sensible eccentricity
+(0.4-0.55), scale, and orientation; `regularise_elliptic_sac` runs cleanly
+(correct output shape, low NaN fraction) and gridness stays finite and
+sane after correction. The MATLAB source itself flags this whole method as
+"not fully tested... requires further testing before publishing results" —
+correction does not reliably *improve* gridness on both test cells (it did
+for t2c1, was roughly flat for t2c3), consistent with that original caveat
+rather than indicating a port defect.
+
+## 9. Things confirmed correct and bit-exact
 
 `.pos`/tetrode/`.cut` binary readers (big-endian, 216-byte spikes, 20-byte pos
 records); LED swap + speed filtering; NaN interpolation; 20-tap boxcar position

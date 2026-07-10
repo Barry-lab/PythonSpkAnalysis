@@ -55,7 +55,9 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `circ_regress_cb.m` | `circular_linear_regression(x, t, k, pp_dir)` | public — phase precession fit |
 | `lineTraj_*` | — | **not yet ported** (`PORTING_PLAN.md` v0.4, deferred) |
 | `Analysis_Freq` (theta/LFP/phase) | — | **not yet ported** (needs EEG/EGF loader first — see `PORTING_PLAN.md`) |
-| grid ellipse fit/correct, 2-D FFT, field shuffle | — | **not yet ported** (`PORTING_PLAN.md` v0.5/v0.7) |
+| `gridEllipse_fit.m` | `fit_grid_ellipse(sac)` | public — ellipse fit to 6 central peaks |
+| `gridEllipse_correct.m` / `regularise_eliptic_grid.m` | `regularise_elliptic_sac(sac, ab_scale, orient_deg)` | public — de-ellipse a SAC |
+| 2-D FFT grid analysis, cross-SAC, field shuffle | — | **not yet ported** (`PORTING_PLAN.md` v0.5/v0.7) |
 
 Everything marked *internal* runs inside `load_dacq`; you do not call it directly,
 but it is exposed for validation and testing.

@@ -60,7 +60,7 @@ Recording-level `crunch_decode` orchestrator, and `circ_regress_cb` (phase-prece
 regression — infra-free, built-in Fisher B.20 oracle). No infra; grouped because it is the biggest
 concentration of column-major/1-based index risk and shares validation discipline.
 
-**v0.5 — Grid extras: elliptical correction, 2D-FFT, cross-SAC, expanding gridness.**
+**v0.5 — Grid extras: elliptical correction (DONE), 2D-FFT, cross-SAC, expanding gridness.**
 `gridEllipse_fit`, `regularise_elliptic_sac` (single copy), `xSacProps`, the 2D-FFT subpackage
 (`fftVars`, `get_2d_fft`, `get_polar_fft`, `main_spatial_fft2`), and `fs_fastGridness`
 (expanding/Langston gridness). Niche siblings (`brandonRegEcc`, `sacProps90deg`) only if elliptical /
