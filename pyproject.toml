@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "barrelab"
+version = "0.1.0"
+description = "Spatial-coding analysis for tetrode (DACQ) and Neuropixels recordings"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Barry Lab", email = "caswell.barry@ucl.ac.uk" }]
+keywords = ["neuroscience", "electrophysiology", "place cells", "grid cells", "axona", "neuropixels"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "numpy>=1.21",
+    "scipy>=1.7",
+]
+
+[project.optional-dependencies]
+# Neuropixels front end (added in a later phase): loading + sorting live here so
+# a DACQ-only user gets a featherweight install.
+neuropixels = ["spikeinterface>=0.100", "probeinterface>=0.2"]
+# NWB export/interchange (boundary only, not the working object).
+nwb = ["pynwb>=2.5", "neuroconv>=0.4"]
+plot = ["matplotlib>=3.5"]
+dev = [
+    "pytest>=7",
+    "pytest-cov",
+    "hypothesis",
+    "ruff",
+    "mypy",
+]
+
+[project.urls]
+Homepage = "https://github.com/Barry-lab/barrelab"
+Source = "https://github.com/Barry-lab/barrelab"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/barrelab"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true
