@@ -54,9 +54,13 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `decode_crunchData.m` | `crunch_decode(recording, cells, ...)` | public — Recording-level orchestrator (redesign, not bit-exact) |
 | `circ_regress_cb.m` | `circular_linear_regression(x, t, k, pp_dir)` | public — phase precession fit |
 | `lineTraj_*` | — | **not yet ported** (`PORTING_PLAN.md` v0.4, deferred) |
-| `Analysis_Freq` (theta/LFP/phase) | — | **not yet ported** (needs EEG/EGF loader first — see `PORTING_PLAN.md`) |
 | `gridEllipse_fit.m` | `fit_grid_ellipse(sac)` | public — ellipse fit to 6 central peaks |
 | `gridEllipse_correct.m` / `regularise_eliptic_grid.m` | `regularise_elliptic_sac(sac, ab_scale, orient_deg)` | public — de-ellipse a SAC |
+| `read_eeg_file.m` | `io.axona._read_eeg` | internal — 250Hz .eeg reader |
+| `getegf.m` (raw read only, no decimation — see `FINDINGS.md`) | `io.axona._read_egf` | internal — 4.8kHz .egf reader |
+| `eeg_convert_to_volts.m` | `io.axona.eeg_convert_to_volts(samples, channel, settings, kind)` | public — counts to volts |
+| (LFP loading) | `load_dacq(..., load_lfp=True)` -> `Recording.lfp` | public — unlocks theta/LFP analysis |
+| `Analysis_Freq` theta/power/ripple analysis | — | **not yet ported** (`PORTING_PLAN.md` v0.6b) |
 | 2-D FFT grid analysis, cross-SAC, field shuffle | — | **not yet ported** (`PORTING_PLAN.md` v0.5/v0.7) |
 
 Everything marked *internal* runs inside `load_dacq`; you do not call it directly,

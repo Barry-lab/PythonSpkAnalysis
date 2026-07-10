@@ -118,3 +118,13 @@ def big_endian_view(u8, dtype):
     """
     contiguous = np.ascontiguousarray(u8, dtype=np.uint8)
     return contiguous.view(np.dtype(dtype).newbyteorder(">"))
+
+
+def little_endian_view(u8, dtype):
+    """Interpret a contiguous uint8 array as a little-endian ``dtype`` array.
+
+    Unlike every other DACQ file (big-endian), ``.egf`` is written
+    little-endian (``getegf.m`` opens it with MATLAB's ``'ieee-le'``).
+    """
+    contiguous = np.ascontiguousarray(u8, dtype=np.uint8)
+    return contiguous.view(np.dtype(dtype).newbyteorder("<"))

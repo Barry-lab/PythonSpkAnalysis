@@ -17,7 +17,12 @@ import numpy as np
 from ..core.recording import Electrode, Recording
 from ..params import POS_MAX_SPEED_MS, POS_SMOOTH_BOXCAR_S
 from . import _position
-from ._axona_files import big_endian_view, key_value, read_axona_file
+from ._axona_files import (
+    big_endian_view,
+    key_value,
+    little_endian_view,
+    read_axona_file,
+)
 
 # Tetrode files store 4 channels x (4-byte timestamp + 50 int8 waveform samples)
 # = 54 bytes/channel = 216 bytes/spike. Timestamps are identical across the 4
@@ -113,7 +118,111 @@ def _tetrodes_in_use(settings):
     return used
 
 
-def load_dacq(path, load_position=True,
+def _read_eeg(path):
+    """Read a ``.eeg`` file (250 Hz, signed 8-bit). Port of ``read_eeg_file.m``.
+
+    Returns ``(samples, header)``; ``samples`` are raw signed int8 counts
+    (not yet volts -- see :func:`eeg_convert_to_volts`).
+    """
+    header, data = read_axona_file(path, has_binary=True)
+    n_samples = int(key_value(header, "num_EEG_samples", "num"))
+    samples = np.frombuffer(data, dtype=np.int8)[:n_samples].astype(np.float64)
+    return samples, header
+
+
+def _read_egf(path):
+    """Read a ``.egf`` file (4.8 kHz, signed 16-bit, little-endian).
+
+    Port of ``getegf.m``, minus its optional decimation step (kept out of
+    this low-level reader; see :mod:`barrylab.analysis.lfp` for an explicit,
+    clearly-caveated resampling helper -- MATLAB's ``decimate()`` uses a
+    specific IIR filter design that is not guaranteed to reproduce bit-exact
+    in another language/library, so the raw undecimated signal is the
+    faithful, unambiguous thing to return here). Unlike every other DACQ
+    file, ``.egf`` is little-endian.
+
+    Returns ``(samples, header)``; ``samples`` are raw signed int16 counts.
+    """
+    header, data = read_axona_file(path, has_binary=True)
+    n_samples = int(key_value(header, "num_EGF_samples", "num"))
+    buf = np.frombuffer(data, dtype=np.uint8)
+    samples = little_endian_view(buf, np.int16).reshape(-1)[:n_samples].astype(np.float64)
+    return samples, header
+
+
+def eeg_convert_to_volts(samples, eeg_channel, settings, kind="eeg"):
+    """Convert raw DACQ EEG/EGF counts to volts. Port of ``eeg_convert_to_volts.m``.
+
+    Parameters
+    ----------
+    samples : ndarray
+        Raw signed counts from :func:`_read_eeg` (``kind="eeg"``, int8) or
+        :func:`_read_egf` (``kind="egf"``, int16).
+    eeg_channel : int
+        The 1-based EEG channel number (matches ``EEG_ch_N``/``saveEEG_ch_N``
+        in the ``.set`` file).
+    settings : Header
+        The parsed ``.set`` header.
+    kind : {"eeg", "egf"}
+        ``"eeg"`` (default) for 8-bit 250 Hz data, ``"egf"`` for 16-bit 4.8 kHz.
+
+    Returns
+    -------
+    ndarray of volts.
+    """
+    adc_fullscale = key_value(settings, "ADC_fullscale_mv", "num")
+    conv_factor = {1500.0: 1.5, 3680.0: 3.68, 3000.0: 3.00}.get(adc_fullscale)
+    if conv_factor is None:
+        raise ValueError("unrecognised ADC_fullscale_mv %r in settings" % (adc_fullscale,))
+
+    samples = np.asarray(samples, dtype=np.float64)
+    if kind == "eeg":
+        samples = samples / 128.0
+    elif kind == "egf":
+        samples = samples / 32768.0
+    else:
+        raise ValueError("kind must be 'eeg' or 'egf'")
+
+    # eeg_channel is 1-based; the .set file's gain_ch_N keys are 0-based.
+    gain = key_value(settings, "gain_ch_%d" % (eeg_channel - 1), "num", exact=True)
+    return (conv_factor / gain) * samples
+
+
+def _active_eeg_channels(settings, max_channels=16):
+    """EEG channel numbers (1-based) flagged as saved in the ``.set`` file."""
+    active = []
+    for n in range(1, max_channels + 1):
+        flag = key_value(settings, "saveEEG_ch_%d" % n, "num", exact=True)
+        if flag:
+            active.append(n)
+    return active
+
+
+def _load_lfp_channel(stem, channel, settings):
+    """Load one EEG channel's data (prefers the high-rate .egf if present)."""
+    suffix = "" if channel == 1 else str(channel)
+    egf_path = "%s.egf%s" % (stem, suffix)
+    eeg_path = "%s.eeg%s" % (stem, suffix)
+
+    if os.path.exists(egf_path):
+        raw, header = _read_egf(egf_path)
+        kind = "egf"
+    elif os.path.exists(eeg_path):
+        raw, header = _read_eeg(eeg_path)
+        kind = "eeg"
+    else:
+        return None
+
+    volts = eeg_convert_to_volts(raw, channel, settings, kind=kind)
+    return {
+        "samples": volts,
+        "sample_rate": key_value(header, "sample_rate", "num"),
+        "channel": channel,
+        "kind": kind,
+    }
+
+
+def load_dacq(path, load_position=True, load_lfp=False,
               max_speed=POS_MAX_SPEED_MS, box_car=POS_SMOOTH_BOXCAR_S,
               head_pos_weighting="tracking"):
     """Load a raw Axona/DACQ trial into a :class:`Recording`.
@@ -125,6 +234,11 @@ def load_dacq(path, load_position=True,
         stripped). E.g. ``".../83812141"`` or ``".../83812141.set"``.
     load_position
         If ``True`` read and post-process the ``.pos`` file.
+    load_lfp
+        If ``True``, load every EEG channel flagged as saved in the ``.set``
+        file into ``Recording.lfp`` (preferring the high-rate ``.egf`` over
+        ``.eeg`` where both exist). If a list of channel numbers, load only
+        those. ``False`` (default) skips LFP loading.
     max_speed, box_car
         Position-processing parameters (see :mod:`barrylab.params`).
     head_pos_weighting : {"tracking", "midpoint"}
@@ -191,5 +305,13 @@ def load_dacq(path, load_position=True,
             clusters=clusters,
             metadata={"header": tet_header},
         )
+
+    # --- LFP (.eeg / .egf) ----------------------------------------------
+    if load_lfp:
+        channels = load_lfp if isinstance(load_lfp, (list, tuple)) else _active_eeg_channels(settings)
+        for ch in channels:
+            channel_data = _load_lfp_channel(stem, ch, settings)
+            if channel_data is not None:
+                rec.lfp[ch] = channel_data
 
     return rec

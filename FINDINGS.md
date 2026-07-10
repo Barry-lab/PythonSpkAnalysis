@@ -313,7 +313,49 @@ correction does not reliably *improve* gridness on both test cells (it did
 for t2c1, was roughly flat for t2c3), consistent with that original caveat
 rather than indicating a port defect.
 
-## 9. Things confirmed correct and bit-exact
+## 9. LFP loading infrastructure, v0.6a — the theta/LFP unlock
+
+Added ``.eeg``/``.egf`` reading to the DACQ loader (`load_dacq(...,
+load_lfp=True)`) and a `Recording.lfp` field, unblocking the whole
+theta/LFP/phase-precession analysis family. Ported `eeg_convert_to_volts.m`
+faithfully. `.eeg` (250 Hz, signed 8-bit) reuses the existing
+`data_start`/`data_end` framing infrastructure directly (`read_axona_file`),
+since it turns out to use exactly the same marker convention as `.pos` and
+the tetrode files.
+
+**`.egf` (4.8 kHz, signed 16-bit) also uses that same marker framing —
+simpler and more robust than the MATLAB reader's approach.** `getegf.m`
+doesn't search for `data_start` at all; it hardcodes "read exactly 8 header
+lines, extract sample rate, read 2 more lines, extract sample count, then
+skip forward 10 bytes" — which only works if the header always has exactly
+10 lines before the marker. Confirmed against the real example `.egf`
+header that this coincides with the marker-search approach for
+standard-format files, so reused the same robust `read_axona_file` +
+`little_endian_view` (a new helper — `.egf` is the one DACQ file that is
+little-endian; everything else is big-endian) infrastructure instead of
+replicating the fragile fixed-line-count parsing.
+
+**Deliberately did not port `getegf.m`'s decimation step.** MATLAB's
+`decimate()` uses a specific Chebyshev IIR filter design; reproducing it
+bit-exact in another language/library isn't something `scipy.signal.decimate`
+(a different default filter) can guarantee, and goal 1 is "same results," not
+"a plausible-looking approximation." `_read_egf`/`load_dacq` return the raw,
+undecimated 4.8 kHz signal — an honest, unambiguous choice — rather than
+silently offer a resampled signal that looks right but may not numerically
+match MATLAB's output. A caveated, explicitly-approximate decimation helper
+can be added later if a bit-exact comparison becomes necessary.
+
+**Validation.** Structural + physiological plausibility (no MATLAB fixture
+for LFP data yet): loaded sample counts imply a duration that matches the
+session's position-derived duration to within 1 second for every channel on
+r1838 (3 EEG channels). A crude FFT of the first 60s of the primary channel
+peaks at 9.58 Hz within the 4-12 Hz band — squarely in the classic
+hippocampal theta range for a foraging rat, a meaningful physiological
+sanity check that the byte layout and endianness are being read correctly
+(a parsing error would far more likely produce noise or an implausible peak
+than a textbook theta frequency).
+
+## 10. Things confirmed correct and bit-exact
 
 `.pos`/tetrode/`.cut` binary readers (big-endian, 216-byte spikes, 20-byte pos
 records); LED swap + speed filtering; NaN interpolation; 20-tap boxcar position

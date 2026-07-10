@@ -96,13 +96,18 @@ class Recording(object):
         Tracked camera window, in pixels.
     electrodes : dict[int, Electrode]
         Sorted spikes keyed by tetrode/group id.
+    lfp : dict[int, dict]
+        Local field potential channels keyed by EEG channel number. Each
+        value is a dict with ``samples`` (1-D, volts), ``sample_rate`` (Hz),
+        ``channel`` and ``kind`` (``"eeg"`` = 250 Hz or ``"egf"`` = 4.8 kHz,
+        both undecimated). Empty if no LFP was loaded.
     metadata : dict
         Free-form provenance (source path, format, raw headers).
     """
 
     def __init__(self, name, xy=None, direction=None, speed=None,
                  pos_times=None, pos_sample_rate=None, pixels_per_metre=None,
-                 window=None, electrodes=None, metadata=None):
+                 window=None, electrodes=None, lfp=None, metadata=None):
         self.name = name
         self.xy = xy
         self.direction = direction
@@ -112,6 +117,7 @@ class Recording(object):
         self.pixels_per_metre = pixels_per_metre
         self.window = window
         self.electrodes = electrodes if electrodes is not None else {}  # type: Dict[int, Electrode]
+        self.lfp = lfp if lfp is not None else {}  # type: Dict[int, dict]
         self.metadata = metadata or {}
 
     @property
