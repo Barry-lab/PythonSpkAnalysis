@@ -50,6 +50,14 @@ fix.smthRm    = make_smooth_ratemap(fix.occupancy, fix.spikeMap, ...
                                            vars.rm.adaptiveSmoothAlpha);
 [fix.bits_per_spike, fix.bits_per_sec] = skaggsInfo(adRate, adPos);
 
+% --- grid analysis: SAC + gridness (Analysis_General / Analysis_Grid) ---
+fix.sac        = xPearson(fix.smthRm);      % spatial autocorrelogram of smooth rate map
+[fix.gridness_std, fix.gridness_exp] = multiGridness(fix.sac);
+gp             = sacProps(fix.sac);
+fix.grid_scale       = gp.scale;            % grid scale in SAC bins
+fix.grid_orientation = gp.peakOrient;       % axis orientations, deg CCW from +x
+fix.grid_mean_r      = gp.meanROfPeaks;     % mean r at the six central peaks
+
 fix.trialPath = trialPath; fix.tet = tet; fix.cell = cell;
 save(outFile, '-struct', 'fix');
 fprintf('Wrote %s\n', outFile);

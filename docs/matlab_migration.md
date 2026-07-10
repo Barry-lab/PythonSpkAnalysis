@@ -30,7 +30,10 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `skaggsInfo.m` | `spatial_information(rates, dwell_times)` | public |
 | `skaggsAdaptiveBinning.m` | `adaptive_binning(dwell_times, spikes, alpha=200)` | public |
 | `default_vars.m` | `barrelab.params` | subset ported so far |
-| `Analysis_Grid` (gridness/SAC) | — | **not yet ported** (roadmap v0.2) |
+| `xPearson.m` (`Analysis_General`) | `spatial_autocorrelogram(rate_map)` | public — the SAC |
+| `multiGridness.m` | `gridness(sac)` → `(standard, expanding)` | public |
+| `sacProps.m` | `grid_properties(sac)` | public — scale/orientation/peaks |
+| `Analysis_Grid` (ellipse fit, 2-D FFT, field shuffle) | — | **not yet ported** (roadmap v0.2+) |
 | `Analysis_Dir` (head direction) | — | **not yet ported** (roadmap v0.2) |
 | `Analysis_Freq` (theta/LFP/phase) | — | **not yet ported** (roadmap v0.4+) |
 | `Decoding` (Bayesian) | — | **not yet ported** (roadmap v0.4+) |

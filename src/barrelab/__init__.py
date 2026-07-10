@@ -13,6 +13,12 @@ consume. Typical use::
 
 from .core.recording import Electrode, Recording
 from .io.axona import load_dacq
+from .analysis.grid import (
+    grid_properties,
+    grid_score,
+    gridness,
+    spatial_autocorrelogram,
+)
 from .analysis.maps import occupancy_map, rate_map, smooth_ratemap, spike_map
 from .analysis.spatial import adaptive_binning, spatial_information
 
@@ -28,4 +34,8 @@ __all__ = [
     "smooth_ratemap",
     "spatial_information",
     "adaptive_binning",
+    "spatial_autocorrelogram",
+    "gridness",
+    "grid_properties",
+    "grid_score",
 ]

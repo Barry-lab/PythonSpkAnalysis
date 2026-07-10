@@ -54,8 +54,35 @@ current golden-master test.
 - **`key_value` prefix matching** — the default (non-`exact`) match is by string
   prefix, so a key like `EEG_ch_1` also matches `EEG_ch_10..16`. The MATLAB callers
   pass `'exact'` where this matters; the port preserves that.
+- **`multiGridness.m` line ~163: `innerRadi`** — the expanding-gridness inner radius
+  is `mean(sqrt(sum(closestPeaksCoordCentral.^2)))/2`. The `sum` has no dimension
+  argument, so it sums *down columns* (over peaks) rather than per-peak
+  (`sum(...,2)`), which does not match the stated intent ("half of mean distance to
+  the six central peaks"). Likely a latent bug. The port replicates the MATLAB
+  behaviour so numbers match; flag for the PI whether to fix it (only affects the
+  expanding gridness, which maximises over radii anyway).
 
-## 3. Things confirmed correct and bit-exact
+## 3. Grid-cell analysis port (SAC + gridness), v0.2
+
+Ported `xPearson.m` -> `spatial_autocorrelogram`, `multiGridness.m` -> `gridness`
+(standard + expanding), and `sacProps.m` -> `grid_properties`. The MATLAB
+image-processing calls (`imregionalmax`, `bwlabel`, `regionprops`, `imrotate`) are
+reproduced with `scipy.ndimage` (no scikit-image dependency). `imregionalmax` is
+approximated as a 3×3 maximum-filter equality restricted to positive bins; on real
+(sharp-peaked) SACs this finds the same peaks, but could differ from MATLAB on
+pathological plateaus.
+
+**Validation (structural, not yet bit-exact).** No golden gridness fixture ships
+with the toolbox, so the port is validated by behaviour: the SAC is exact by
+construction (central bin = 1, point-symmetric), a synthetic hexagonal grid scores
+high gridness, and — the strong check — the port reproduces the example README's
+ground truth: it scores the documented grid cells (tetrode 2 cells 1 and 3) at
+gridness 1.25 and 0.85 and the non-grid cells (2c4, 2c5) at −0.20 and 0.19. Grid
+scale comes out at 40 cm. To lock these bit-exact, `validation/generate_fixtures.m`
+now also dumps `sac`, `gridness_std/exp`, `grid_scale/orientation/mean_r` from the
+current MATLAB; add a regression test asserting `np.allclose` once a fixture exists.
+
+## 4. Things confirmed correct and bit-exact
 
 `.pos`/tetrode/`.cut` binary readers (big-endian, 216-byte spikes, 20-byte pos
 records); LED swap + speed filtering; NaN interpolation; 20-tap boxcar position
