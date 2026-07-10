@@ -62,7 +62,7 @@ and `circ_regress_cb` (phase-precession circular–linear regression — infra-f
 oracle). No infra; grouped because it is the biggest concentration of column-major/1-based index risk
 and shares validation discipline.
 
-**v0.5 — Grid extras: elliptical correction (DONE), fast/Langston gridness (DONE), cross-SAC (DONE), 2D-FFT.**
+**v0.5 — Grid extras: elliptical correction (DONE), fast/Langston gridness (DONE), cross-SAC (DONE), 2D-FFT (DONE). STATUS: DONE.**
 `gridEllipse_fit`, `regularise_elliptic_sac` (single copy) DONE. `fs_fastGridness`
 (expanding/Langston gridness) DONE — `grid.py::fast_gridness`, a confirmed-non-bit-comparable sibling
 of `gridness`/`grid_properties` (see its docstring + `FINDINGS.md`). `xSacProps` DONE —
@@ -72,9 +72,13 @@ hand-built known-peak fixture, and a likely genuine MATLAB fragility found on re
 before peak-finding swamps the true structure — see `FINDINGS.md`), faithfully preserved and documented,
 not fixed. `brandonRegEcc` DONE — `grid_ellipse.py::brandon_regularise`, a self-admittedly weaker
 alternative ellipse correction (validated structurally, including one exact algebraic identity for
-regular hex grids — see `FINDINGS.md`). Still to do: the 2D-FFT subpackage (`fftVars`, `get_2d_fft`,
-`get_polar_fft`, `main_spatial_fft2`) — the largest remaining v0.5 piece (a 1000-iteration shuffle
-significance test). Niche `sacProps90deg` only if square-grid analysis is wanted.
+regular hex grids — see `FINDINGS.md`). `fftVars`/`get_2d_fft`/`get_polar_fft`/`main_spatial_fft2` DONE
+— `spatial_fft.py` (`FFTParams`, `power_spectrum_2d`, `to_polar_fft`, `grid_fft_components`); the
+component transforms validated against synthetic known-frequency/known-offset fixtures (including an
+exact brute-force cross-check of the polar rebinning's NaN-propagating mean aggregation), the
+Recording-level orchestrator validated structurally + a synthetic known-angle/known-wavelength grating
++ the real example grid cell — see `FINDINGS.md` §21. Niche `sacProps90deg` only if square-grid analysis
+is wanted.
 
 **v0.6 — NEW INFRA: EEG/EGF loading (v0.6a DONE) → then LFP/theta analysis (v0.6b DONE).**
 *v0.6a (infra):* add `.eeg` (int8, 250 Hz) and `.egf` (int16, 4.8 kHz) reading to the DACQ loader, an
@@ -172,10 +176,10 @@ vector (docstring says mean — averaging line is commented out); preserve, expo
 | `brandonRegEcc` | `grid_ellipse.py::brandon_regularise` | A | no | SYN (regular-hex algebraic identity + structural; see `FINDINGS.md`) | **DONE** |
 | `sacProps90deg` | `grid.py::square_grid_props` (or `symmetry=4` flag) | A | no | GF+STRUCT | niche |
 | `xSacProps` | `analysis/grid_phase.py::cross_sac_props` | A | no | SYN (hand-built known-peak fixture, exact match; see `FINDINGS.md` for a likely genuine MATLAB fragility found on realistic input) | **DONE** |
-| `fftVars` | `analysis/spatial_fft.py::FFTParams` (dataclass) | — | no | — | useful |
-| `get_2d_fft` | `spatial_fft.py::power_spectrum_2d` | A | no | GF | useful (subpkg core) |
-| `get_polar_fft` | `spatial_fft.py::to_polar_fft` | A | no | GF | useful (subpkg core) |
-| `main_spatial_fft2` | `spatial_fft.py::grid_fft_components` | R | no | GF (deterministic parts) + seeded shuffle | useful |
+| `fftVars` | `analysis/spatial_fft.py::FFTParams` (dataclass) | — | no | — | **DONE** |
+| `get_2d_fft` | `spatial_fft.py::power_spectrum_2d` | A | no | SYN (known-frequency grating; DC-removal; max_rad mask; edge-corrected smoothing) | **DONE** |
+| `get_polar_fft` | `spatial_fft.py::to_polar_fft` | A | no | SYN (known-offset peak placement; exact brute-force cross-check of the mean-aggregation incl. NaN propagation; 0/180 wraparound merge; circular-angle/non-wrapping-radius smoothing) | **DONE** |
+| `main_spatial_fft2` | `spatial_fft.py::grid_fft_components` | R | no | STRUCT + SYN (known-angle/known-wavelength synthetic grating recovered; flat-ratemap negative control) + real example grid cell | **DONE** |
 | `main_spatial_fft` (v1) | — | — | — | — | **skip (superseded by v2)** |
 | `fs_fastGridness` | `grid.py::fast_gridness` | A | no | SYN (hex-grid + real grid-cell ballpark cross-check vs `gridness`/`grid_properties`, see `FINDINGS.md`) | **DONE** |
 | `fs_fixWatershed` | `analysis/field_shuffle.py::_fix_watershed` | A | **watershed** | STRUCT | **DONE** |

@@ -36,7 +36,10 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `fs_fastGridness.m` | `analysis.grid.fast_gridness(sac)` → `(standard, expanding, scale)` | public — NOT bit-comparable to `gridness`/`grid_properties`, see its docstring |
 | `xPearson.m` (cross mode) | `analysis.grid.cross_correlogram(rm_a, rm_b)` | public — cross-SAC between two rate maps |
 | `xSacProps.m` | `analysis.grid_phase.cross_sac_props(xsac)` | public — see docstring: a likely real MATLAB fragility on realistic data (check `peak_corr`), see `FINDINGS.md` |
-| `Analysis_Grid` (2-D FFT, field shuffle orchestration) | — | **not yet ported** (roadmap v0.5/v0.7) |
+| `fftVars.m` | `analysis.spatial_fft.FFTParams` | public — parameter dataclass; `max_rad` is a derived property |
+| `get_2d_fft.m` | `analysis.spatial_fft.power_spectrum_2d(rate_map, fft_size, smth_sig, max_rad)` | public — mean-normalised, zero-padded 2-D FFT power spectrum |
+| `get_polar_fft.m` | `analysis.spatial_fft.to_polar_fft(ps2d, max_rad, th_bin, r_bin, sigma)` | public — polar (angle/radius) reorganisation of a 2-D FFT power spectrum |
+| `main_spatial_fft2.m` | `analysis.spatial_fft.grid_fft_components(recording, electrode, cluster, ...)` | public — Recording-level redesign like `crunch_decode`, not bit-exact; `main_spatial_fft.m` (v1) superseded, not ported |
 | `cb_circMean.m` | `circular_mean(angles, weights, wrap=...)` | public — circular mean; see `wrap` note below |
 | `dir_kldiv.m` / `kldiv.m` | `directionality(tuning_curve)` | public — directionality index |
 | `circ_FTT.m` | `directional_fft(tuning_curve)` | public — multimodal/hexadirectional |
@@ -74,7 +77,6 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `fs_shufFields.m` | `field_shuffle.shuffle_fields(shape, field_bin_loc, static_bin, rng=...)` | public — involves genuine randomness, see docstring/`FINDINGS.md` |
 | `fs_masterAnalysis.m` | `field_shuffle.field_shuffle_significance(recording, electrode, cluster, ...)` | public — Recording-level redesign like `crunch_decode`, not bit-exact |
 | `identify_grid_cell.m` | `field_shuffle.is_grid_cell(recording, electrode, cluster, ...)` | public — see docstring/`FINDINGS.md` for 2 genuine MATLAB bugs found, not reproduced |
-| 2-D FFT grid analysis, cross-SAC | — | **not yet ported** (`PORTING_PLAN.md` v0.5) |
 
 Everything marked *internal* runs inside `load_dacq`; you do not call it directly,
 but it is exposed for validation and testing.

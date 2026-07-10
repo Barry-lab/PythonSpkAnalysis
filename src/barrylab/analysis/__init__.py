@@ -26,6 +26,7 @@ from .phase_precession import circular_linear_regression
 from .place_fields import field_stats, spatial_coherence, spatial_correlation
 from .pxd import place_by_direction, pxd
 from .spatial import adaptive_binning, spatial_information, true_ppm_bounding_box
+from .spatial_fft import FFTParams, grid_fft_components, power_spectrum_2d, to_polar_fft
 
 __all__ = [
     "rate_map",
@@ -62,4 +63,8 @@ __all__ = [
     "fit_grid_ellipse",
     "regularise_elliptic_sac",
     "power_spectrum",
+    "FFTParams",
+    "power_spectrum_2d",
+    "to_polar_fft",
+    "grid_fft_components",
 ]

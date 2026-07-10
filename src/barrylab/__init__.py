@@ -48,6 +48,7 @@ from .analysis.phase_precession import circular_linear_regression
 from .analysis.place_fields import field_stats, spatial_coherence, spatial_correlation
 from .analysis.pxd import place_by_direction, pxd
 from .analysis.spatial import adaptive_binning, spatial_information, true_ppm_bounding_box
+from .analysis.spatial_fft import FFTParams, grid_fft_components, power_spectrum_2d, to_polar_fft
 
 __version__ = "0.1.0"
 
@@ -98,4 +99,8 @@ __all__ = [
     "best_line",
     "reget_line_band",
     "line_residual",
+    "FFTParams",
+    "power_spectrum_2d",
+    "to_polar_fft",
+    "grid_fft_components",
 ]

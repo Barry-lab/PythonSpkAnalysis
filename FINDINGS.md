@@ -1027,3 +1027,194 @@ guaranteed to divide evenly by 50 (unlike the always-integer-ratio case for
 standard 250Hz `.eeg`) — this sidesteps a spurious `ValueError` for a
 computation that was never going to use that output anyway, rather than
 computing and discarding it.
+
+## 21. 2-D FFT grid analysis (`2DFFT_Anl/`), v0.5 complete — the last v0.5 piece
+
+Ported the whole subpackage into `analysis/spatial_fft.py`: `fftVars.m` ->
+`FFTParams` (a dataclass; `max_rad` is a derived `@property`, exactly
+matching `f.maxRad=ceil((1/f.minWaveCm)*(f.binSizeCm*f.fftSize))` staying
+live if any of the three inputs change, rather than a stored field that
+could go stale). `get_2d_fft.m` -> `power_spectrum_2d` (mean-normalise,
+zero-pad, FFT, fftshift, optional edge-corrected Gaussian smoothing, optional
+radius mask). `get_polar_fft.m` -> `to_polar_fft` (reorganise into polar
+coordinates via a mean aggregation per (angle, radius) bin, optional
+circular-in-angle/non-wrapping-in-radius Gaussian smoothing).
+`main_spatial_fft.m` (v1) confirmed skipped per `PORTING_PLAN.md` — its own
+header says use v2, and it bins via the superseded `bin_pos_data` and starts
+workers via the obsolete `goPar`. `main_spatial_fft2.m` -> `grid_fft_components`,
+a `Recording`-level redesign (like `crunch_decode`/`field_shuffle_significance`
+— not bit-exact, validate the component transforms instead).
+
+**Confirmed by directly reading both sources: `get_polar_fft.m`'s mean
+aggregation uses an explicit NaN fill, genuinely different from the
+visually-similar radial-profile aggregation in `fs_fastGridness.m`/
+`grid.py::fast_gridness`.** `get_polar_fft.m` calls
+`accumarray(subs, vals, sz, @(x) mean(x), nan)` — bins nothing ever lands in
+come back NaN. `fast_gridness`'s own radial-correlation profile (a
+`bincount`-based aggregation, not accumarray, but the same "sum per bin
+divided by count per bin" idea) never specifies a fill value, so unfilled
+bins there are 0 by MATLAB's own accumarray default — a genuinely different
+convention in sibling-looking code, exactly the trap the porting brief
+flagged in advance. `to_polar_fft` reproduces the NaN-fill convention via
+`np.bincount` with a separate `np.full(..., nan)` output initialised before
+scattering in `counts > 0` bins — and, critically, does **not** use
+`nanmean`/ignore NaN pixels when summing: MATLAB's plain `mean()` propagates
+a single NaN input to the whole bin's result, which is reproduced simply by
+summing the (possibly-NaN) pixel values directly with `np.bincount` (NaN
+arithmetic propagates through the sum on its own). This matters in practice
+because `power_spectrum_2d`'s own `max_rad` circle-mask and `to_polar_fft`'s
+independently-recomputed (rounded) radius can disagree by up to ~0.5 bins
+right at the boundary, so a rebinned cell can legitimately have both
+NaN-masked and un-masked contributing pixels — and MATLAB's behaviour there
+(whole-bin NaN, not a partial/ignoring average) is preserved. Validated with
+a from-scratch, independently-written brute-force reference implementation
+(looping in Python over every selected pixel, replicating the same
+round/mod formulas, and comparing bin-for-bin, NaN-mask and all) against
+random inputs with injected NaNs and deliberately coarse bins (to force
+genuine multi-pixel collisions) — exact match
+(`test_to_polar_fft_binning_matches_brute_force_reference_including_nan_propagation`).
+
+**A real, if minor, inconsistency between `get_2d_fft.m` and
+`get_polar_fft.m`'s treatment of the same `maxRad==0` "no limit" sentinel —
+faithfully preserved, not fixed.** `get_2d_fft.m` correctly treats
+`maxRad==0` as "return every frequency, unmasked" (`if maxRad` guards the
+whole masking block). `get_polar_fft.m` ALSO documents `maxRad==0` as valid
+(`if maxRad ... else ...` picks between two coordinate ranges), but its
+final crop line, `psPol=psPol(:,1:maxRad+1)`, runs **unconditionally**
+outside that if/else — so `maxRad==0` collapses the polar output down to
+radius bin 0 only, silently defeating its own "no limit" convention. Never
+exercised in practice (`fftVars.m`/`main_spatial_fft2.m` always compute a
+genuine positive `maxRad` from `minWaveCm`), so this is dormant, not a live
+bug for the real pipeline — reproduced literally in `to_polar_fft` (the crop
+is unconditional there too) and called out prominently in its docstring
+warning rather than special-cased away.
+
+**A genuine, correctly-replicated property of `get_2d_fft.m`'s optional
+smoothing, initially mistaken for a possible port bug and then confirmed
+correct by direct inspection.** `get_2d_fft.m`'s Gaussian kernel size is
+`ceil(smthSig.*4)` with **no odd-forcing step** (unlike `get_polar_fft.m`'s
+own smoothing kernel, which explicitly rounds up to odd:
+`kernSize=kernSize+mod(kernSize+1,2)`). For a `smthSig` whose `ceil(4*sigma)`
+lands on an even number (e.g. `smthSig=1.5` -> `ceil(6.0)=6`), MATLAB's own
+`fspecial('gaussian', hsize, sigma)` construction (`siz=(hsize-1)/2`,
+`meshgrid(-siz:siz,...)`) has **no single centre tap** — its coordinates
+straddle 0 symmetrically (e.g. `[-2.5,-1.5,-0.5,0.5,1.5,2.5]`) rather than
+including 0 itself. Correlating this kernel with a peak sitting exactly on
+an integer output bin therefore genuinely, correctly ties the two straddling
+output bins — confirmed directly in `power_spectrum_2d` (a synthetic
+single-frequency grating's smoothed peak came back bit-identical across two
+adjacent rows, `141.11768525504368` at both), not a numerical-precision
+artefact or an indexing bug. `power_spectrum_2d` reproduces this literally
+(no odd-forcing, matching `get_2d_fft.m` exactly); a first draft of its test
+wrongly asserted a single unique peak row and was corrected to tolerate the
+tie once the mechanism was traced through by hand (see the standing
+"investigate before assuming a bug" discipline).
+
+**Confirmed the `mod(round(th/thBin), 180/thBin)` rebinning deliberately
+merges the 0deg and 180deg bins — a real, load-bearing consequence of the
+"only process half the spectrum" optimisation, not an edge-case bug.** A
+real 2-D FFT power spectrum is point-symmetric about its centre
+(`ps2D(cx+dx,cy+dy) == ps2D(cx-dx,cy-dy)`), so `get_polar_fft.m` only
+computes the half with `y<=0` to save time (see its own comment). But two
+*genuinely distinct* points that are NOT the FFT's own conjugate-symmetric
+pair — e.g. two hand-placed synthetic peaks at `(dy=0, dx=+5)` and
+`(dy=0, dx=-5)` — both sit on the boundary `y=0` row that IS included in the
+selected half, and both round to angle 0/180 respectively, which the mod
+step folds into the *same* output bin, averaging them together
+(`test_to_polar_fft_wraps_0_and_180_degrees_into_the_same_bin`). This first
+surfaced as a failing "does an isolated peak survive rebinning?" test that
+happened to place its peak exactly on the `y=0` row and collided with an
+implicit background-zero at its own mirror position — investigated (not
+patched around) and found to be the algorithm's intended half-spectrum
+optimisation working exactly as designed, not a bug; the test was corrected
+to place its peak off that row instead, and a second test was added to pin
+down and document the merging behaviour explicitly.
+
+**MATLAB `max()`/`prctile()` NaN-ignoring semantics, reproduced.**
+`main_spatial_fft2.m`'s `shufMaxPower(nn)=max(shufPsPol(:))` and
+`sndPeakThresh=max(angMean).*f.sndPeakCoef` both rely on MATLAB's default
+NaN-ignoring `max()` — the polar FFT (and its angular collapse) legitimately
+contain NaN (untouched rebin cells; angular rows where every radial
+component fell below threshold). Reproduced with `np.nanmax` at both call
+sites (not plain `max`/`np.max`, which would instead propagate NaN through
+everything downstream — the exact recurring MATLAB-vs-numpy gotcha flagged
+across this whole project). `prctile(shufMaxPower,95)` similarly drops NaN
+by MATLAB's own documented behaviour, reproduced with `np.nanpercentile`.
+
+**A deliberate design decision, explicitly instructed and clearly flagged,
+not a MATLAB transcription: the temporal shuffle's rotation bound is
+two-sided, not one-sided like the MATLAB.** `main_spatial_fft2.m`'s own
+`sf_shuf_spk_ind` draws `randShft=ceil(rand()*(nPosPt-minShuf))+minShuf` —
+one-sided: it only guarantees the shift is *at least* `minShuf`, saying
+nothing about staying far from `nPosPt` itself. Since the shift then wraps
+via `mod(spkInd+randShft, nPosPt)`, a draw close to `nPosPt` produces an
+almost-zero *effective* rotation after wraparound, silently defeating
+`minShuf`'s whole purpose for a genuine (if narrow) slice of the draw range
+— a real, if minor, latent fragility in the original. Per the porting
+brief's explicit instruction to reuse
+`field_shuffle_significance`'s already-established convention for
+consistency, `grid_fft_components` instead draws from a **two-sided** bound
+`[min_rot_samp, n_pos - min_rot_samp]`, exactly matching that function's own
+generalisation of the identical MATLAB pattern (see FINDINGS.md §18) —
+genuinely bounded away from a near-zero effective rotation on both sides.
+Also generalises the MATLAB's hardcoded 50 Hz (`f.minShuf*50`) to
+`recording.pos_sample_rate`, again matching `field_shuffle_significance`.
+
+**Design choice: the orchestrator returns a single dict with a `significant`
+flag, rather than MATLAB's `deal([])` on 4 separate outputs when no angular
+component clears the shuffle threshold.** `main_spatial_fft2.m` returns
+`[ps2D, psPol, fCompAngDeg, fCompWaveCm]=deal([])` (all-empty) in the
+early-return branch. `grid_fft_components` always returns a fully-populated
+dict (`ps2d`, `ps_polar`, `theta_deg`, `angular_profile`, etc. are always
+present, since they're computed regardless of significance), with
+`significant=False` and empty `peak_angle_deg`/`peak_wavelength_cm` arrays
+in that case — a natural, minor consequence of choosing a dict return for a
+non-bit-exact orchestrator (matching `crunch_decode`/
+`field_shuffle_significance`'s own dict-return style), not a MATLAB
+behaviour change.
+
+**Validation.** `power_spectrum_2d`: a clean synthetic sinusoidal grating
+with an exact integer number of cycles across the (unpadded) ratemap
+recovers its known spatial frequency exactly (peak at `+/- fft_size/wavelength`
+bins from centre, on the correct row for an x-only grating); DC-removal
+confirmed (`ps2d[centre,centre] ~= 0`); `max_rad` masking confirmed exact
+against an independently-computed distance grid; edge-corrected smoothing
+stays finite and preserves the peak location (up to the even-kernel-tie
+above). `to_polar_fft`: single-known-offset-peak placement exact; the
+brute-force NaN-propagating-mean cross-check above; `max_rad`-too-large and
+non-square-input raise explicitly (new-code robustness, not MATLAB-fidelity
+— see `to_polar_fft`'s own docstring); scalar vs. equal-tuple `sigma`
+agree exactly. `_smooth_polar_fft`: a constant field is invariant under the
+edge-corrected smoothing (exact, matching the identical invariant already
+used to validate `smooth_ratemap`); a synthetic impulse confirms genuine
+angular wraparound (row 0 <-> row 179) and confirms the radius axis never
+wraps (an impulse at the max-radius edge never reaches column 0).
+`grid_fft_components`: a from-scratch synthetic `Recording` with spikes
+deterministically weighted (not Poisson-sampled — avoids sampling noise
+diluting the check) to produce a known-orientation, known-wavelength
+sinusoidal grating ratemap is correctly flagged significant and recovers
+both the angle (within ~3deg of the expected `(-60)%180=120` degrees — note
+the sign flip from the y-down image convention, confirmed empirically, see
+`_synthetic_grating_recording`'s own docstring) and wavelength (within
+~20%) across every seed checked (0-4); a flat (no spatial structure) control
+is reliably (checked across 6+ seeds) *not* flagged significant — a real
+significance test, so this is an empirical stability check, not a
+mathematical guarantee. On the real, documented grid cell (r1838 t2c3):
+runs cleanly at default `fft_size=512` even with only 5 shuffles (~0.2s),
+comes back significant, and at least one recovered Fourier component's
+wavelength lands close to the theoretically-expected `cos(30deg) * grid_scale
+~= 34.6cm` (documented scale ~40cm, see FINDINGS.md §4) — a meaningful
+real-data cross-check spanning the whole pipeline, not just synthetic
+fixtures.
+
+**Full FINDINGS.md-tracked design decisions, summarised for the PI:** (1)
+two-sided (not MATLAB's one-sided) temporal-shuffle rotation bound — a
+deliberate, explicitly-instructed generalisation matching
+`field_shuffle_significance`, not a fidelity gap; (2) `max_rad==0`'s
+"no limit" convention is honoured by `power_spectrum_2d` but not by
+`to_polar_fft`'s unconditional crop — a real but dormant MATLAB
+inconsistency, faithfully preserved since it never triggers in the actual
+pipeline; (3) `get_2d_fft.m`'s un-odd-forced smoothing kernel can produce
+genuine adjacent-bin ties — correct behaviour, not a bug, and worth knowing
+if anyone visualises `power_spectrum_2d`'s smoothed output at high
+zoom.
