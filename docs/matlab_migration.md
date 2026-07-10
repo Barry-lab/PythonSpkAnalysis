@@ -34,7 +34,9 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `multiGridness.m` | `gridness(sac)` → `(standard, expanding)` | public |
 | `sacProps.m` | `grid_properties(sac)` | public — scale/orientation/peaks |
 | `fs_fastGridness.m` | `analysis.grid.fast_gridness(sac)` → `(standard, expanding, scale)` | public — NOT bit-comparable to `gridness`/`grid_properties`, see its docstring |
-| `Analysis_Grid` (2-D FFT, cross-SAC, field shuffle orchestration) | — | **not yet ported** (roadmap v0.5/v0.7) |
+| `xPearson.m` (cross mode) | `analysis.grid.cross_correlogram(rm_a, rm_b)` | public — cross-SAC between two rate maps |
+| `xSacProps.m` | `analysis.grid_phase.cross_sac_props(xsac)` | public — see docstring: a likely real MATLAB fragility on realistic data (check `peak_corr`), see `FINDINGS.md` |
+| `Analysis_Grid` (2-D FFT, field shuffle orchestration) | — | **not yet ported** (roadmap v0.5/v0.7) |
 | `cb_circMean.m` | `circular_mean(angles, weights, wrap=...)` | public — circular mean; see `wrap` note below |
 | `dir_kldiv.m` / `kldiv.m` | `directionality(tuning_curve)` | public — directionality index |
 | `circ_FTT.m` | `directional_fft(tuning_curve)` | public — multimodal/hexadirectional |

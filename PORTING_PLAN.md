@@ -62,14 +62,17 @@ and `circ_regress_cb` (phase-precession circular–linear regression — infra-f
 oracle). No infra; grouped because it is the biggest concentration of column-major/1-based index risk
 and shares validation discipline.
 
-**v0.5 — Grid extras: elliptical correction (DONE), fast/Langston gridness (DONE), 2D-FFT, cross-SAC.**
+**v0.5 — Grid extras: elliptical correction (DONE), fast/Langston gridness (DONE), cross-SAC (DONE), 2D-FFT.**
 `gridEllipse_fit`, `regularise_elliptic_sac` (single copy) DONE. `fs_fastGridness`
 (expanding/Langston gridness) DONE — `grid.py::fast_gridness`, a confirmed-non-bit-comparable sibling
-of `gridness`/`grid_properties` (see its docstring + `FINDINGS.md`). Still to do: `xSacProps`, the 2D-FFT
-subpackage (`fftVars`, `get_2d_fft`, `get_polar_fft`, `main_spatial_fft2`). Niche siblings
-(`brandonRegEcc`, `sacProps90deg`) only if elliptical / square-grid analysis is wanted. No infra,
-**but** confirm the ported SAC supports cross-correlation
-mode (needed by `xSacProps`).
+of `gridness`/`grid_properties` (see its docstring + `FINDINGS.md`). `xSacProps` DONE —
+`grid_phase.py::cross_sac_props` + a public `grid.py::cross_correlogram` (the SAC machinery already
+supported cross mode privately, just needed a public wrapper); core geometry validated exact against a
+hand-built known-peak fixture, and a likely genuine MATLAB fragility found on realistic data (zero-clip
+before peak-finding swamps the true structure — see `FINDINGS.md`), faithfully preserved and documented,
+not fixed. Still to do: the 2D-FFT subpackage (`fftVars`, `get_2d_fft`, `get_polar_fft`,
+`main_spatial_fft2`) — the largest remaining v0.5 piece (a 1000-iteration shuffle significance test).
+Niche siblings (`brandonRegEcc`, `sacProps90deg`) only if elliptical / square-grid analysis is wanted.
 
 **v0.6 — NEW INFRA: EEG/EGF loading (v0.6a DONE) → then LFP/theta analysis (v0.6b PARTIAL: power_spectrum DONE; eeg_instant_freq_power/detect_ripples deferred).**
 *v0.6a (infra):* add `.eeg` (int8, 250 Hz) and `.egf` (int16, 4.8 kHz) reading to the DACQ loader, an
@@ -149,7 +152,7 @@ vector (docstring says mean — averaging line is commented out); preserve, expo
 | `regularise_eliptic_grid` | *(byte-identical dup)* alias to above | A | no | — | **skip (dup)** |
 | `brandonRegEcc` | `grid_ellipse.py::brandon_regularise` | A | no | GF (low value) | niche |
 | `sacProps90deg` | `grid.py::square_grid_props` (or `symmetry=4` flag) | A | no | GF+STRUCT | niche |
-| `xSacProps` | `analysis/grid_phase.py::cross_sac_props` | A | no (needs SAC cross mode) | GF | useful |
+| `xSacProps` | `analysis/grid_phase.py::cross_sac_props` | A | no | SYN (hand-built known-peak fixture, exact match; see `FINDINGS.md` for a likely genuine MATLAB fragility found on realistic input) | **DONE** |
 | `fftVars` | `analysis/spatial_fft.py::FFTParams` (dataclass) | — | no | — | useful |
 | `get_2d_fft` | `spatial_fft.py::power_spectrum_2d` | A | no | GF | useful (subpkg core) |
 | `get_polar_fft` | `spatial_fft.py::to_polar_fft` | A | no | GF | useful (subpkg core) |
@@ -238,9 +241,9 @@ loop logic + `strcmp('eeg',varargin)` (string-vs-cell) option detection.
    no-skimage stance); (c) replace field segmentation with a peak+threshold+Voronoi scheme. Must be
    resolved before `fs_shufFields`/`fs_masterAnalysis`. Nothing outside FieldShuffle needs it.
 
-3. **SAC cross-correlation mode (small).** `xSacProps` consumes a *cross*-correlogram of two ratemaps.
-   Confirm the ported `spatial_autocorrelogram`/`xPearson` supports two-input cross mode; if only
-   auto mode was ported, add cross mode first.
+3. **SAC cross-correlation mode (small). DONE.** `xSacProps` consumes a *cross*-correlogram of two
+   ratemaps. The private `_pearson_all_lags` already supported two distinct maps; added a public
+   `grid.py::cross_correlogram` wrapper alongside `xSacProps`'s own port.
 
 4. **Dependencies to add (all already implied by scipy/numpy stack):** `scipy.special`
    (`gamma`/`gammaln` for decoding and pxd), `scipy.optimize.minimize_scalar` (circ regression),

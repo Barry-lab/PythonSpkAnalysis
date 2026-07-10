@@ -610,11 +610,72 @@ a strong grid cell. Given the five confirmed divergences above, exact
 agreement was never expected; the ballpark cross-check is there to catch a
 port bug that would make the two wildly disagree, not to assert equivalence.
 
-## 15. Things confirmed correct and bit-exact
+## 15. `xSacProps.m` -> `cross_sac_props`, v0.5 — a likely real MATLAB fragility found
+
+Ported `xSacProps.m` into a new `grid_phase.py::cross_sac_props`, plus a
+public `grid.py::cross_correlogram` (the already-private `_pearson_all_lags`
+already supported two distinct maps — the plan's "confirm the ported SAC
+supports cross-correlation mode" note just needed a thin public wrapper).
+
+**Validated the core geometry (cart2pol/wrapTo2Pi/distance-then-angle
+sorting/1-based-vs-0-based indexing) is an exact translation** using a
+hand-built xSAC with peaks placed at exactly-known pixel positions on a
+strictly-varying (no ties, no flat regions) background — every returned
+field (`phase_mag`, `phase_ang`, `peak_coord`, `peak_corr`, and all three
+`axis_ang_dist` rows) matched the known ground truth exactly
+(`test_cross_sac_props_recovers_known_peak_geometry_exactly`).
+
+**Then found something worth flagging per the standing "watch for bugs in
+the original MATLAB" instruction — likely a genuine fragility in
+`xSacProps.m` itself, not just this port.** Running the same function on a
+*realistic* xSAC (two synthetic hex-grid rate maps, deliberately offset from
+each other, cross-correlated) gave a clearly wrong answer: `peak_corr` came
+back as exactly `0.0` and `phase_mag` didn't match the true injected offset.
+Root cause, confirmed by direct inspection of the intermediate arrays (not
+assumed): `xSacProps.m` zero-clips every negative correlation bin
+(`xsac(xsac<0)=0`) *before* calling `imregionalmax`. For a real correlogram
+(58-62% of bins were negative/zero-clipped in these test cases — real
+correlation surfaces spend most of their area away from genuine structure)
+this creates one or more huge flat regions at exactly `0`, and
+`imregionalmax` treats a flat region as trivially "locally maximal"
+everywhere within it — so `find()` returns thousands of spuriously-tied,
+meaningless zero-valued "peak" candidates alongside the handful of genuine
+ones. Since every field this function returns is chosen by proximity
+(closest peak to the xSAC's geometric centre, then closest six peaks to
+*that* peak), and a zero-plateau boundary pixel is almost always nearer than
+the next genuine hexagonal peak, the true structure gets swamped. Manually
+separating the candidate peaks by value (`==0` vs `>0`) confirmed the
+*genuine* peaks were exactly where a correctly-working algorithm should put
+them (matching the known grid scale) — it's specifically the
+proximity-search step that gets misled, not the peak values themselves.
+
+This only manifested because a *realistic* (not toy) synthetic case was
+tried in addition to the clean ground-truth one — a good example of why
+"validated on a clean synthetic case" and "validated on realistic data" are
+different tiers (see the validation-discipline checklist). Faithfully
+preserved (not fixed) per goal 1: `cross_sac_props` zero-clips exactly as
+`xSacProps.m` does. Documented prominently in the function's own docstring
+(check `peak_corr` before trusting the other fields) and pinned by
+`test_cross_sac_props_swamped_by_zero_clipped_background_on_realistic_input`,
+so this is a known, understood limitation rather than a silent trap for
+whoever next calls this function on real data.
+
+**Requires >= 7 detected peaks, exactly as unforgivingly as the MATLAB.**
+`xSacProps.m` indexes `dist(2:7)` unconditionally, which errors in MATLAB if
+fewer than 7 peaks exist. Python's slicing doesn't error the same way (`x[1:7]`
+on a shorter array silently truncates), which would have made `cross_sac_props`
+silently return a malformed `axis_ang_dist` with fewer than 3 rows instead of
+failing — added an explicit `ValueError` for this precondition so the failure
+mode matches MATLAB's in spirit (a clear error) even though the literal
+mechanism differs.
+
+## 16. Things confirmed correct and bit-exact
 
 `.pos`/tetrode/`.cut` binary readers (big-endian, 216-byte spikes, 20-byte pos
 records); LED swap + speed filtering; NaN interpolation; 20-tap boxcar position
 smoothing (scipy `origin=0` matches MATLAB `imfilter`); `timestamp/timebase`;
 1-based→0-based `pos_sample`; cluster selection; and `histnd` spatial binning.
 Line-trajectory best-fit-line round-trip self-consistency (118/118 real replay
-events from `pMat_data.mat`, see §13).
+events from `pMat_data.mat`, see §13). Cross-SAC phase geometry
+(`cross_sac_props`) against a hand-built xSAC with exactly-known peak
+positions (see §15).

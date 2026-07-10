@@ -97,6 +97,35 @@ def spatial_autocorrelogram(rate_map_2d, min_overlap=None):
     return coef
 
 
+def cross_correlogram(rate_map_a, rate_map_b, min_overlap=None):
+    """Cross spatial-correlogram between two rate maps (``xPearson.m``, cross mode).
+
+    Like :func:`spatial_autocorrelogram` but between two distinct maps —
+    typically two cells from the same grid module, whose cross-correlogram's
+    central-peak offset from the geometric centre encodes their relative
+    spatial phase (see :func:`~barrylab.analysis.grid_phase.cross_sac_props`).
+    Unlike an autocorrelogram, there is no guarantee the peak nearest the
+    geometric centre sits exactly at it, and central-symmetry does not apply.
+
+    Parameters
+    ----------
+    rate_map_a, rate_map_b : ndarray
+        (Smoothed) firing-rate maps; NaN bins (unvisited) are ignored.
+    min_overlap : int, optional
+        If given, bins computed from fewer than this many overlapping map
+        bins are set to NaN.
+
+    Returns
+    -------
+    ndarray
+        The cross spatial-correlogram, shape ``(ny_a+ny_b-1, nx_a+nx_b-1)``.
+    """
+    coef, n = _pearson_all_lags(rate_map_a, rate_map_b, "full")
+    if min_overlap is not None:
+        coef = np.where(n < min_overlap, np.nan, coef)
+    return coef
+
+
 # --------------------------------------------------------------------------
 # Peak finding on the SAC (shared by sacProps.m and multiGridness.m)
 # --------------------------------------------------------------------------

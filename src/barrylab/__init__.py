@@ -32,6 +32,7 @@ from .analysis.direction import (
     resultant_vector,
 )
 from .analysis.grid import (
+    cross_correlogram,
     fast_gridness,
     grid_properties,
     grid_score,
@@ -39,6 +40,7 @@ from .analysis.grid import (
     spatial_autocorrelogram,
 )
 from .analysis.grid_ellipse import fit_grid_ellipse, regularise_elliptic_sac
+from .analysis.grid_phase import cross_sac_props
 from .analysis.lfp import power_spectrum
 from .analysis.line_trajectory import best_line, line_residual, reget_line_band
 from .analysis.maps import occupancy_map, rate_map, smooth_ratemap, spike_map
@@ -65,6 +67,8 @@ __all__ = [
     "grid_properties",
     "grid_score",
     "fast_gridness",
+    "cross_correlogram",
+    "cross_sac_props",
     "head_direction_map",
     "head_direction_stats",
     "directional_occupancy",
