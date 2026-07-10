@@ -378,7 +378,67 @@ session) / 9.38 Hz (a position-restricted subset), both cleanly in the
 hippocampal theta signature for a foraging rat, and a strong end-to-end
 sanity check spanning the new LFP loader (v0.6a) through this analysis.
 
-## 11. Things confirmed correct and bit-exact
+## 11. Watershed field segmentation, v0.7 (partial)
+
+The PI chose to add `scikit-image` (a new optional `[fieldshuffle]` extra —
+scipy has no watershed transform) rather than vendor one or substitute a
+simpler peak+threshold scheme. Ported the field-**segmentation** stage:
+`watershed_fields()` (`watershed(-wsRm)` from `fs_masterAnalysis.m`, followed
+by `fs_fixWatershed.m`'s ridge-bin reassignment) and `field_bin_locations()`
+(`fs_binMembLoc.m`: each field's peak and every other bin's polar offset from
+it). Lives in `analysis/field_shuffle.py`, not eagerly imported by the
+top-level package (matching the existing lightweight-by-default pattern for
+`[neuropixels]`/`[nwb]` — a DACQ-only user shouldn't need scikit-image).
+
+**Confirmed a real API gap in scikit-image's `watershed()` before writing
+any port code, rather than assume.** MATLAB's `watershed()` leaves ridge
+lines unlabelled (0) by design — `fs_fixWatershed.m`'s whole purpose is
+reassigning those. `skimage.segmentation.watershed()` defaults to
+`watershed_line=False`, which assigns *every* pixel to a basin with no
+ridge left to reassign — silently making the whole two-stage MATLAB design
+pointless if used as-is. Verified with a tiny synthetic test that
+`watershed_line=True` restores the 0-labelled-ridge behaviour MATLAB
+depends on, and used `connectivity=2` to match MATLAB's default 8-connectivity
+for 2-D images (skimage's default `connectivity=1` is 4-connected).
+
+**A real bug in my own new code, found and fixed via validation, not
+MATLAB-fidelity.** A first draft additionally forced every unvisited-position
+bin to label 0 *after* running watershed, which doesn't match MATLAB (which
+only zeroes the *rate map* before watershedding and lets the transform
+itself decide those bins' fate) — this corrupted the ridge-only semantics
+`fs_fixWatershed` depends on and crashed `field_bin_locations` on an
+all-NaN field slice. Fixed by removing the post-hoc overwrite; validated by
+confirming every bin then belongs to exactly one field (`sum(field sizes) ==
+total bins`) and that `_fix_watershed`'s reassignments are always computed
+against the *original* (pre-reassignment) labels — verified with a
+purpose-built test where a naive in-place implementation would pick the
+wrong neighbour.
+
+**Not yet ported: `fs_shufFields.m` (the actual randomised field-reallocation
+shuffle) and the `fs_masterAnalysis.m`/`identify_grid_cell.m` orchestration.**
+These need substantially more careful treatment than the segmentation stage
+here — `fs_shufFields.m` is a genuinely intricate iterative algorithm
+(random field-centre reallocation, per-field random orientation, polar-order
+bin placement, round-robin interleaving across fields), and the
+orchestration additionally depends on `fs_fastGridness.m` (a *different*,
+Langston-2011-specific expanding-gridness variant — not the same as the
+already-shipped `gridness()`'s expanding measure, which follows
+`multiGridness.m`'s simpler heuristic) and `brandonRegEcc.m` (not yet
+ported). Rather than deliver a rushed, under-validated version of the most
+algorithmically complex code in the toolbox, this is left for a dedicated
+pass. Still tracked in `PORTING_PLAN.md`.
+
+**Validation.** `_fix_watershed` unit-tested directly, including a
+purpose-built case distinguishing "uses frozen original labels" from a naive
+in-place implementation. `watershed_fields` + `field_bin_locations` validated
+on synthetic two-peak data (correct peak recovery, correct field-size
+accounting) and on the real r1838 grid cell (16 fields found via unmarked
+watershed — plausible over-segmentation for a marker-free watershed, a known
+general property of the method itself rather than a port defect, though not
+cross-checked against MATLAB directly; every one of the map's bins accounted
+for in exactly one field).
+
+## 12. Things confirmed correct and bit-exact
 
 `.pos`/tetrode/`.cut` binary readers (big-endian, 216-byte spikes, 20-byte pos
 records); LED swap + speed filtering; NaN interpolation; 20-tap boxcar position

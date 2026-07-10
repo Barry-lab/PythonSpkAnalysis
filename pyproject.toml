@@ -29,6 +29,9 @@ neuropixels = ["spikeinterface>=0.100", "probeinterface>=0.2"]
 # NWB export/interchange (boundary only, not the working object).
 nwb = ["pynwb>=2.5", "neuroconv>=0.4"]
 plot = ["matplotlib>=3.5"]
+# Watershed field segmentation for the field-shuffle grid-cell significance
+# test (analysis/field_shuffle.py) -- scipy has no watershed implementation.
+fieldshuffle = ["scikit-image>=0.17"]
 dev = [
     "pytest>=7",
     "pytest-cov",

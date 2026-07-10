@@ -73,7 +73,7 @@ mode (needed by `xSacProps`).
 `eeg_instant_freq_power`, `eeg_power_spectra`, `detect_ripples` (ripples require `.egf`). This is the
 only phase blocked on new infra; everything above is independent of it.
 
-**v0.7 — Watershed-gated FieldShuffle (resolve watershed first).**
+**v0.7 — Watershed-gated FieldShuffle. STATUS: watershed decision RESOLVED (scikit-image added); segmentation stage (watershed_fields, field_bin_locations) DONE; fs_shufFields + orchestration still pending.**
 `fs_fixWatershed`, `fs_binMembLoc`, `fs_shufFields`, `fs_masterAnalysis`, `identify_grid_cell`. Blocked
 on a watershed segmentation decision (vendor one / add skimage / replace with peak+threshold). Last
 because it is a self-contained research sub-project with the heaviest single blocker.

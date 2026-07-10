@@ -62,7 +62,10 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | (LFP loading) | `load_dacq(..., load_lfp=True)` -> `Recording.lfp` | public — unlocks theta/LFP analysis |
 | `eeg_power_spectra.m` | `power_spectrum(eeg, pos2use, ...)` | public — FFT power spectrum, theta peak/s2n |
 | `eeg_instant_freq_power.m`, `detect_ripples.m` | — | **not yet ported** (`PORTING_PLAN.md` v0.6b, deferred) |
-| 2-D FFT grid analysis, cross-SAC, field shuffle | — | **not yet ported** (`PORTING_PLAN.md` v0.5/v0.7) |
+| `fs_masterAnalysis.m` watershed step + `fs_fixWatershed.m` | `field_shuffle.watershed_fields(rate_map, occupancy)` | public — needs `barrylab[fieldshuffle]` |
+| `fs_binMembLoc.m` | `field_shuffle.field_bin_locations(labels, rate_map)` | public — needs `barrylab[fieldshuffle]` |
+| `fs_shufFields.m`, `fs_masterAnalysis.m`/`identify_grid_cell.m` orchestration | — | **not yet ported** (`PORTING_PLAN.md` v0.7, deferred) |
+| 2-D FFT grid analysis, cross-SAC | — | **not yet ported** (`PORTING_PLAN.md` v0.5) |
 
 Everything marked *internal* runs inside `load_dacq`; you do not call it directly,
 but it is exposed for validation and testing.
