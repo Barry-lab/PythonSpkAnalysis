@@ -47,6 +47,26 @@ def test_smooth_ratemap_marks_unvisited_nan():
     assert np.isfinite(rate[2, 2])
 
 
+def test_smooth_ratemap_gaussian_uniform_gives_constant_rate():
+    # edge normalisation makes a uniform field exact for the gaussian too
+    dwell = np.full((6, 6), 0.02)
+    spikes = np.ones((6, 6))
+    rate, _, _ = smooth_ratemap(dwell, spikes, kern_size=2, kern_type="gaussian")
+    assert np.allclose(rate, 50.0)
+
+
+def test_smooth_ratemap_gaussian_spreads_a_spike():
+    dwell = np.full((15, 15), 0.02)
+    spikes = np.zeros((15, 15))
+    spikes[7, 7] = 10  # a single hot bin
+    tight, _, _ = smooth_ratemap(dwell, spikes, kern_size=1, kern_type="gaussian")
+    wide, _, _ = smooth_ratemap(dwell, spikes, kern_size=3, kern_type="gaussian")
+    assert np.all(np.isfinite(tight)) and np.all(np.isfinite(wide))
+    # the peak stays over the hot bin, and more smoothing lowers/spreads it
+    assert np.unravel_index(np.nanargmax(tight), tight.shape) == (7, 7)
+    assert wide[7, 7] < tight[7, 7]
+
+
 def test_smooth_ratemap_rejects_bad_kernel():
     with pytest.raises(ValueError):
         smooth_ratemap(np.ones((3, 3)), np.ones((3, 3)), kern_type="triangle")

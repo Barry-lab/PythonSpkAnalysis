@@ -53,3 +53,20 @@ def test_binning_totals(example_trial, golden_mat):
     rm = bl.rate_map(rec, 2, 3)
     both = ~np.isnan(rm) & ~np.isnan(golden_mat["smthRm"])
     assert np.corrcoef(rm[both], golden_mat["smthRm"][both])[0, 1] > 0.9
+
+
+def test_rate_map_smoothing_options(example_trial):
+    """boxcar (default), gaussian and no-smoothing all produce valid maps."""
+    import barrelab as bl
+
+    rec = bl.load_dacq(example_trial)
+    box = bl.rate_map(rec, 2, 3)                                   # default boxcar-5
+    gauss = bl.rate_map(rec, 2, 3, smoothing="gaussian", smooth_size=2)
+    raw = bl.rate_map(rec, 2, 3, smoothing=None)
+
+    for rm in (box, gauss, raw):
+        assert rm.shape == (62, 62)
+        assert np.array_equal(np.isnan(rm), np.isnan(raw))  # same visited support
+    # smoothing reduces bin-to-bin variance relative to the raw map
+    assert np.nanstd(box) < np.nanstd(raw)
+    assert np.nanstd(gauss) < np.nanstd(raw)

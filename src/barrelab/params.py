@@ -15,8 +15,10 @@ POS_SMOOTH_BOXCAR_S = 0.4
 # --- Rate maps (easy_make_ratemap.m / default_vars.m) --------------------
 #: Spatial bin size in cm. 2 cm is the lab standard (== old Tint 8 px bin).
 RATEMAP_BIN_CM = 2.0
-#: Boxcar smoothing kernel width in bins for 2-D rate maps.
+#: Default boxcar smoothing kernel width in bins for 2-D rate maps.
 RATEMAP_SMOOTH_BINS = 5
+#: Default Gaussian smoothing sigma in bins (used when smoothing="gaussian").
+RATEMAP_GAUSS_SIGMA = 2.0
 
 # --- Adaptive binning (skaggsAdaptiveBinning.m) --------------------------
 #: Alpha used by Skaggs adaptive smoothing prior to spatial information.

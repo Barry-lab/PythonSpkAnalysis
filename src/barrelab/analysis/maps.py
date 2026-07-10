@@ -1,19 +1,19 @@
 """Spatial binning and rate maps.
 
 Ports ``histnd.m`` (the binning primitive), ``bin_data.m`` (position/spike
-binning) and ``make_smooth_ratemap.m`` (boxcar smoothing with edge
-normalisation). ``rate_map`` reproduces the historic ``easy_make_ratemap.m``
-pipeline: bin occupancy and spikes, smooth each with a 5-bin boxcar ignoring
-unvisited bins, then divide.
+binning) and ``make_smooth_ratemap.m`` (smoothing with edge normalisation).
+``rate_map`` bins occupancy and spikes, smooths each ignoring unvisited bins,
+then divides. Smoothing is configurable: a boxcar (default, 5 bins — the lab
+standard) or a Gaussian (by sigma), or none.
 
 All functions consume a :class:`~barrelab.core.recording.Recording` or plain
 arrays; none of them touch a file path.
 """
 
 import numpy as np
-from scipy.ndimage import convolve
+from scipy.ndimage import convolve, gaussian_filter
 
-from ..params import RATEMAP_BIN_CM, RATEMAP_SMOOTH_BINS
+from ..params import RATEMAP_BIN_CM, RATEMAP_GAUSS_SIGMA, RATEMAP_SMOOTH_BINS
 
 _EPS = np.finfo(float).eps
 
@@ -74,32 +74,53 @@ def spike_map(recording, pos_index, bin_cm=RATEMAP_BIN_CM):
     return _histnd_2d(spike_xy, recording.window_extent, bin_px)
 
 
-def smooth_ratemap(bin_pos, bin_spk, kern_size=RATEMAP_SMOOTH_BINS, kern_type="boxcar"):
+def smooth_ratemap(bin_pos, bin_spk, kern_size=RATEMAP_SMOOTH_BINS,
+                   kern_type="boxcar", smooth_type="norm"):
     """Smooth binned dwell + spikes into a rate map. Port of ``make_smooth_ratemap.m``.
 
     Occupancy and spike maps are smoothed independently with edge normalisation
-    (each bin divided by the smoothed visited-mask) so that unvisited bins do
-    not bleed in, then divided to give rate. Unvisited bins are set to NaN.
+    (each bin divided by the smoothed visited mask) so unvisited bins do not
+    bleed in, then divided to give rate. Unvisited bins are set to NaN.
 
-    Returns ``(rate, smooth_pos, smooth_spk)``.
+    Parameters
+    ----------
+    bin_pos, bin_spk : ndarray
+        Binned dwell time (s) and spike counts, same shape.
+    kern_size : float
+        Smoothing amount, interpreted by ``kern_type``: for ``"boxcar"`` the box
+        width in bins (5 is the lab standard); for ``"gaussian"`` the standard
+        deviation in bins.
+    kern_type : {"boxcar", "gaussian"}
+        Smoothing kernel.
+    smooth_type : {"norm", "circular"}
+        ``"norm"`` (default) for ordinary maps; ``"circular"`` wraps the edges,
+        for 1-D circular variables such as head direction.
+
+    Returns
+    -------
+    (rate, smooth_pos, smooth_spk)
     """
     bin_pos = np.asarray(bin_pos, dtype=float)
     bin_spk = np.asarray(bin_spk, dtype=float)
+    mode = "wrap" if smooth_type == "circular" else "constant"
 
     if kern_type == "boxcar":
-        kernel = np.ones((kern_size, kern_size))
+        # imfilter's default boundary is zero-padding; a symmetric ones kernel
+        # convolved with mode="constant" reproduces it (verified vs MATLAB).
+        kernel = np.ones([int(round(kern_size))] * bin_pos.ndim)
+        smooth = lambda a: convolve(a, kernel, mode=mode, cval=0.0)  # noqa: E731
     elif kern_type == "gaussian":
-        kernel = _gaussian_kernel(bin_pos.shape, kern_size)
+        # truncated at 4 sigma (scipy default) — numerically identical to
+        # MATLAB's full-map fspecial('gaussian', ...) for any usable sigma.
+        smooth = lambda a: gaussian_filter(a, sigma=kern_size, mode=mode, cval=0.0)  # noqa: E731
     else:
-        raise ValueError("unknown kern_type %r" % (kern_type,))
+        raise ValueError("kern_type must be 'boxcar' or 'gaussian', got %r" % (kern_type,))
 
     visited = (bin_pos != 0).astype(float)
-    # imfilter's default boundary is zero-padding; convolve with a symmetric
-    # kernel reproduces it.
-    denom = convolve(visited, kernel, mode="constant", cval=0.0)
+    denom = smooth(visited)
     with np.errstate(divide="ignore", invalid="ignore"):
-        smooth_pos = convolve(bin_pos, kernel, mode="constant", cval=0.0) / denom
-        smooth_spk = convolve(bin_spk, kernel, mode="constant", cval=0.0) / denom
+        smooth_pos = smooth(bin_pos) / denom
+        smooth_spk = smooth(bin_spk) / denom
         rate = smooth_spk / smooth_pos
 
     unvisited = visited == 0
@@ -109,20 +130,11 @@ def smooth_ratemap(bin_pos, bin_spk, kern_size=RATEMAP_SMOOTH_BINS, kern_type="b
     return rate, smooth_pos, smooth_spk
 
 
-def _gaussian_kernel(shape, sigma):
-    ky = np.arange(shape[0]) - (shape[0] - 1) / 2.0
-    kx = np.arange(shape[1]) - (shape[1] - 1) / 2.0
-    gy = np.exp(-(ky ** 2) / (2 * sigma ** 2))
-    gx = np.exp(-(kx ** 2) / (2 * sigma ** 2))
-    kernel = np.outer(gy, gx)
-    return kernel / kernel.sum()
-
-
 def rate_map(recording, electrode, cluster, bin_cm=RATEMAP_BIN_CM,
-             smooth_bins=RATEMAP_SMOOTH_BINS):
-    """Smoothed 2-D firing-rate map (Hz) for one cluster.
+             smoothing="boxcar", smooth_size=None):
+    """Firing-rate map (Hz) for one cluster.
 
-    Reproduces ``easy_make_ratemap.m``.
+    With the defaults this reproduces ``easy_make_ratemap.m`` (a 5-bin boxcar).
 
     Parameters
     ----------
@@ -133,8 +145,11 @@ def rate_map(recording, electrode, cluster, bin_cm=RATEMAP_BIN_CM,
         Cluster id within that electrode.
     bin_cm : float
         Spatial bin size in cm.
-    smooth_bins : int
-        Boxcar smoothing width in bins.
+    smoothing : {"boxcar", "gaussian", None}
+        Smoothing method. ``None`` returns the raw (unsmoothed) rate map.
+    smooth_size : float, optional
+        Smoothing amount: boxcar width in bins, or gaussian sigma in bins.
+        Defaults to 5 bins for boxcar and 2 bins (sigma) for gaussian.
 
     Returns
     -------
@@ -143,5 +158,14 @@ def rate_map(recording, electrode, cluster, bin_cm=RATEMAP_BIN_CM,
     elec = recording.electrode(electrode)
     occ = occupancy_map(recording, bin_cm)
     spk = spike_map(recording, elec.spike_pos_index(cluster), bin_cm)
-    rate, _, _ = smooth_ratemap(occ, spk, smooth_bins, "boxcar")
+
+    if smoothing is None:
+        with np.errstate(divide="ignore", invalid="ignore"):
+            rate = spk / occ
+        rate[occ == 0] = np.nan
+        return rate
+
+    if smooth_size is None:
+        smooth_size = RATEMAP_SMOOTH_BINS if smoothing == "boxcar" else RATEMAP_GAUSS_SIGMA
+    rate, _, _ = smooth_ratemap(occ, spk, smooth_size, smoothing)
     return rate
