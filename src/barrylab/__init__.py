@@ -38,6 +38,7 @@ from .analysis.grid import (
     spatial_autocorrelogram,
 )
 from .analysis.maps import occupancy_map, rate_map, smooth_ratemap, spike_map
+from .analysis.phase_precession import circular_linear_regression
 from .analysis.place_fields import field_stats, spatial_coherence, spatial_correlation
 from .analysis.pxd import place_by_direction, pxd
 from .analysis.spatial import adaptive_binning, spatial_information, true_ppm_bounding_box
@@ -78,4 +79,5 @@ __all__ = [
     "spike_counts_per_window",
     "decode_maximum_likelihood",
     "crunch_decode",
+    "circular_linear_regression",
 ]

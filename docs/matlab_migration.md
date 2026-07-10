@@ -52,7 +52,8 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `decode_processPost.m` | `decode_maximum_likelihood(post, recording, bin_px, win_lim)` | public — ML decode + error |
 | `decode_calcBayesPost.m` | `bayesian_posterior_with_prior(...)` | public — full Bayes + movement prior |
 | `decode_crunchData.m` | `crunch_decode(recording, cells, ...)` | public — Recording-level orchestrator (redesign, not bit-exact) |
-| `lineTraj_*`, `circ_regress_cb.m` | — | **not yet ported** (`PORTING_PLAN.md` v0.4) |
+| `circ_regress_cb.m` | `circular_linear_regression(x, t, k, pp_dir)` | public — phase precession fit |
+| `lineTraj_*` | — | **not yet ported** (`PORTING_PLAN.md` v0.4, deferred) |
 | `Analysis_Freq` (theta/LFP/phase) | — | **not yet ported** (needs EEG/EGF loader first — see `PORTING_PLAN.md`) |
 | grid ellipse fit/correct, 2-D FFT, field shuffle | — | **not yet ported** (`PORTING_PLAN.md` v0.5/v0.7) |
 

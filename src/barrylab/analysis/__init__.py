@@ -20,6 +20,7 @@ from .direction import (
 )
 from .grid import grid_properties, grid_score, gridness, spatial_autocorrelogram
 from .maps import occupancy_map, rate_map, smooth_ratemap, spike_map
+from .phase_precession import circular_linear_regression
 from .place_fields import field_stats, spatial_coherence, spatial_correlation
 from .pxd import place_by_direction, pxd
 from .spatial import adaptive_binning, spatial_information, true_ppm_bounding_box
@@ -55,4 +56,5 @@ __all__ = [
     "spike_counts_per_window",
     "decode_maximum_likelihood",
     "crunch_decode",
+    "circular_linear_regression",
 ]

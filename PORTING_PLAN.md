@@ -53,7 +53,7 @@ analysis. Ships the small shared bits everything else reuses.
 `circular_mean`, `directional_kldiv` (+ KL via scipy), `directional_fft`, `led2v1_dir_offset`, and the
 `pxd`/`histnd`/`wrapper_pxd` unit are all shipped in `analysis/direction.py` and `analysis/pxd.py`.
 
-**v0.4 — Population decoding, replay & circular–linear regression.**
+**v0.4 — Population decoding, replay & circular–linear regression. STATUS: decoding core + phase precession DONE; lineTraj_* deferred.**
 Bayesian decoder trio (`decode_calcPost`, `decode_getSpkCnt`, `decode_processPost`),
 `decode_calcBayesPost`, the `lineTraj_*` group (strong shipped oracle `pMat_data.mat`), the
 Recording-level `crunch_decode` orchestrator, and `circ_regress_cb` (phase-precession circular–linear

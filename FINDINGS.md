@@ -106,7 +106,7 @@ ported code (not just port each function in isolation):
   results, not silently fixing bugs; worth a PI decision on whether to correct
   it once parity is established.
 
-## 5. Grid-cell analysis port (SAC + gridness), v0.2
+## 4. Grid-cell analysis port (SAC + gridness), v0.2
 
 Ported `xPearson.m` -> `spatial_autocorrelogram`, `multiGridness.m` -> `gridness`
 (standard + expanding), and `sacProps.m` -> `grid_properties`. The MATLAB
@@ -126,7 +126,7 @@ scale comes out at 40 cm. To lock these bit-exact, `validation/generate_fixtures
 now also dumps `sac`, `gridness_std/exp`, `grid_scale/orientation/mean_r` from the
 current MATLAB; add a regression test asserting `np.allclose` once a fixture exists.
 
-## 6. Place x direction ML model (pxd), v0.3
+## 5. Place x direction ML model (pxd), v0.3
 
 Ported `pxd.m` (the alternating-maximum-likelihood factorial fit) and
 `wrapper_pxd.m` (raw-data binning + smoothing wrapper) as `analysis/pxd.py`.
@@ -164,7 +164,7 @@ place x direction factors, recovered with r>0.8/0.7 respectively by the ML
 fit, plus an exact check of the model's own normalisation invariant (total
 predicted spikes matches actual, per marginal).
 
-## 7. Bayesian decoding, v0.4
+## 6. Bayesian decoding, v0.4
 
 Ported `decode_calcPost.m` -> `bayesian_posterior` (naive ML Poisson population
 decoder), `decode_getSpkCnt.m` -> `spike_counts_per_window` (windowed, optionally
@@ -220,6 +220,43 @@ position (a well-documented real limitation), unlike the clean single-field
 synthetic case which decodes cleanly. The synthetic test is the real
 correctness proof; the real-data numbers are reported for context, not as a
 pass/fail bar.
+
+## 7. Phase precession: circular-linear regression
+
+Ported `circ_regress_cb.m` -> `circular_linear_regression()`
+(`analysis/phase_precession.py`): fits a line relating a linear variable
+(in-field position) to a circular one (theta phase) by maximising the mean
+resultant length of the phase residual over slope, reports a
+circular-circular correlation (Kempter et al. 2012, via the already-ported
+`circular_mean`), and estimates significance by re-fitting on `k` shuffles of
+the phase relative to position. Confirmed this correctly calls the lab's own
+`cb_circMean` (not the buggy toolbox `circ_mean` — see the earlier finding
+about `led2v1_dir_offset.m`; this one has no such landmine).
+
+**Validation oracle resolved a real puzzle, not a bug.** The MATLAB docstring
+embeds Fisher (1993) dataset B.20, claiming it should give `R=-0.316,
+p=0.057` when run through the function. Running the full port on that data
+gave `R=-0.4985`, a real mismatch worth investigating rather than dismissing.
+Re-reading the comment closely: it says the book's R value comes from "a
+circ-circ correlation **after taking 2*atan(t)**" — i.e. Fisher's textbook
+answer correlates a *fixed* transform of the linear variable (`2*atan(x)`)
+against the phase, which is a fundamentally different computation from what
+`circ_regress_cb` actually does (which fits an *optimal* slope for
+`mod(slope*x, 2*pi)`, not the fixed `2*atan(x)` transform) — the two are not
+expected to agree except by coincidence. Confirmed this interpretation
+directly: `kempter_corr(2*atan(x), t) = -0.3160`, matching the book value to
+4 decimal places. So the underlying circular-circular correlation formula
+(and the `circular_mean` it depends on) is now bit-exact validated against an
+independent textbook oracle; the full pipeline is separately validated by
+recovering a known, strong synthetic phase-precession slope accurately
+(within 5%) with a highly significant permutation p-value, while
+random/uncorrelated data reliably gives a far less significant result by
+comparison.
+
+**Not yet ported:** the `lineTraj_*` group (replay/line-trajectory fitting,
+~500 lines across 4 files, with a shipped `pMat_data.mat` oracle per
+`PORTING_PLAN.md`) — deferred to cover more breadth across v0.5/v0.6 given
+time constraints; still on the plan.
 
 ## 8. Things confirmed correct and bit-exact
 
