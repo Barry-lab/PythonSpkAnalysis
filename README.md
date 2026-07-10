@@ -7,10 +7,26 @@ grow into **Neuropixels (SpikeGLX & Open Ephys)** without rewriting a single
 line of analysis code. If you are new to the lab and coming from MATLAB, this is
 where to start.
 
-> **Status: early / proof-of-concept (v0.1).** The DACQ loader, spatial binning,
-> rate maps and Skaggs spatial information are implemented and validated against
-> the lab's MATLAB output (see [Validation](#validation)). Neuropixels loading,
-> gridness, head-direction and LFP analyses are on the [roadmap](#roadmap).
+> **This is an AI-assisted port of `Universal_Matlab`, not yet independently
+> checked by a human. It needs checking.** Every ported function is validated
+> numerically against MATLAB output where a reference exists (bit-exact
+> fixture, synthetic ground truth, or a textbook/analytic oracle — see
+> [Validation](#validation) and [`FINDINGS.md`](FINDINGS.md)), and any MATLAB
+> bugs/quirks found along the way are documented there rather than silently
+> "fixed" — but no lab member has yet reviewed the port line-by-line.
+> `Universal_Matlab` remains the reference implementation and should be
+> treated as ground truth until someone has been through this repo properly.
+> If you use this package for real analysis, please sanity-check your results
+> against the MATLAB toolbox and open an issue if anything looks off. This
+> section will be updated as the port progresses and gets reviewed.
+>
+> **Status: in progress.** DACQ loading, spatial binning, rate maps, Skaggs
+> info, grid/gridness, head direction, place-field stats, Bayesian decoding,
+> phase precession, grid-ellipse correction, LFP loading + power spectrum, and
+> watershed field segmentation are implemented and validated (see
+> [Validation](#validation)). Neuropixels loading and several remaining
+> analyses are on the [roadmap](#roadmap); see
+> [`PORTING_PLAN.md`](PORTING_PLAN.md) for the full current status.
 
 ## One glance
 
@@ -79,7 +95,7 @@ stage by stage.
 
 ```bash
 python3 validation/validate_against_matlab.py     # 15/15 checks pass
-pytest                                            # 17 tests
+pytest                                            # 106 tests
 ```
 
 Two steps intentionally do **not** bit-match this particular fixture because it
@@ -101,10 +117,13 @@ with [`validation/generate_fixtures.m`](validation/generate_fixtures.m).
 
 Full detail and per-function status in [`PORTING_PLAN.md`](PORTING_PLAN.md).
 
-- **v0.1** — DACQ loader, `Recording`, rate maps, Skaggs info, MATLAB validation harness.
-- **v0.2 (in progress)** — spatial autocorrelogram + gridness ✓, head-direction tuning ✓, place-field/coherence/correlation stats ✓; grid ellipse correction, 2-D FFT, plotting next.
-- **v0.3** — Neuropixels front end (SpikeGLX + Open Ephys via SpikeInterface + Kilosort4).
-- **v0.4 → v1.0** — LFP/theta/phase precession, Bayesian decoding, NWB export, plugin loader API.
+- **v0.1** — DACQ loader, `Recording`, rate maps, Skaggs info, MATLAB validation harness. ✓
+- **v0.2** — spatial autocorrelogram + gridness ✓, head-direction tuning ✓, place-field/coherence/correlation stats ✓.
+- **v0.4** — Bayesian decoding (naive ML + full Bayes w/ movement prior) ✓, phase precession ✓.
+- **v0.5** — grid ellipse correction ✓; 2-D FFT grid analysis + cross-SAC still to come.
+- **v0.6** — LFP/EEG loading + power spectrum ✓; instantaneous freq/power and ripple detection still to come.
+- **v0.7 (in progress)** — watershed field segmentation ✓ (`barrylab[fieldshuffle]`); the field-reallocation shuffle itself and `identify_grid_cell` orchestration remain.
+- **v0.3 / v1.0** — Neuropixels front end (SpikeGLX + Open Ephys via SpikeInterface + Kilosort4), NWB export, plugin loader API, human review of the whole port.
 
 ## License
 
