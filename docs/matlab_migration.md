@@ -47,8 +47,13 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `spatialCorrelation.m` | `spatial_correlation(rm1, rm2, stack_maps=True)` | public — remapping/stability |
 | `nan_corr.m` | `nan_corr(var1, var2, corr_type="pearson")` | public — NaN/Inf-safe correlation |
 | `get_true_PPM_boundingBox.m` | `true_ppm_bounding_box(occupancy, bin_px, env_m)` | public — infer true PPM |
+| `decode_calcPost.m` | `bayesian_posterior(obs_spk, rate_maps, t_bin)` | public — naive ML Poisson decoder |
+| `decode_getSpkCnt.m` | `spike_counts_per_window(...)` | public — windowed spike counts |
+| `decode_processPost.m` | `decode_maximum_likelihood(post, recording, bin_px, win_lim)` | public — ML decode + error |
+| `decode_calcBayesPost.m` | `bayesian_posterior_with_prior(...)` | public — full Bayes + movement prior |
+| `decode_crunchData.m` | `crunch_decode(recording, cells, ...)` | public — Recording-level orchestrator (redesign, not bit-exact) |
+| `lineTraj_*`, `circ_regress_cb.m` | — | **not yet ported** (`PORTING_PLAN.md` v0.4) |
 | `Analysis_Freq` (theta/LFP/phase) | — | **not yet ported** (needs EEG/EGF loader first — see `PORTING_PLAN.md`) |
-| `Decoding` (Bayesian) | — | **not yet ported** (`PORTING_PLAN.md` v0.4) |
 | grid ellipse fit/correct, 2-D FFT, field shuffle | — | **not yet ported** (`PORTING_PLAN.md` v0.5/v0.7) |
 
 Everything marked *internal* runs inside `load_dacq`; you do not call it directly,

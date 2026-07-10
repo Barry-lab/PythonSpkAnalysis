@@ -164,7 +164,64 @@ place x direction factors, recovered with r>0.8/0.7 respectively by the ML
 fit, plus an exact check of the model's own normalisation invariant (total
 predicted spikes matches actual, per marginal).
 
-## 7. Things confirmed correct and bit-exact
+## 7. Bayesian decoding, v0.4
+
+Ported `decode_calcPost.m` -> `bayesian_posterior` (naive ML Poisson population
+decoder), `decode_getSpkCnt.m` -> `spike_counts_per_window` (windowed, optionally
+overlapping/Gaussian-smoothed spike counting), `decode_processPost.m` ->
+`decode_maximum_likelihood` (ML decode + accuracy metrics), and
+`decode_calcBayesPost.m` -> `bayesian_posterior_with_prior` (full Bayesian
+decoder with a spatial occupancy prior and a sequential movement/"closeness"
+prior, Zhang et al. 1998 eq. 36). `decode_crunchData.m` is *not* a port but a
+fresh `crunch_decode()` orchestrator redesigned around `Recording` (train/test
+split, build rate maps, decode) — validate the four functions above
+individually, this convenience wrapper is intentionally not bit-exact.
+
+**Two bugs found and fixed in my own new code (not MATLAB-fidelity issues —
+`crunch_decode`/`bayesian_posterior_with_prior` are original code, so these are
+just implementation bugs, fixed directly rather than "faithfully reproduced"):**
+1. `crunch_decode`'s first draft computed occupancy over the *whole* session
+   while spikes were correctly restricted to the training split, diluting the
+   rate-map denominator with test-period dwell time. Fixed by reusing
+   `spike_map` (which already bins an arbitrary position-index subset) for a
+   train-restricted occupancy count too, instead of the whole-session
+   `occupancy_map`.
+2. `bayesian_posterior_with_prior`'s per-step peak-finding used plain
+   `np.argmax`, not `np.nanargmax`. NaN in a numpy array is comparison-broken
+   (`nan > x` is `False`), so with real (partially-unvisited) rate maps a
+   sizeable NaN-contaminated posterior would make `argmax` return the *first*
+   NaN cell as the "decoded" peak — corrupting every subsequent step of the
+   sequential movement-prior filter. MATLAB's `max()` ignores NaN by default,
+   so this was a genuine divergence from the source, not a faithful port of
+   anything. Confirmed the fix: before, per-timestep posterior sums drifted
+   away from 1 in the presence of NaN rate-map bins; after, they're exact.
+
+**A subtler finding worth documenting so it isn't later mistaken for a bug.**
+`decode_processPost.m`'s docstring claims ties in the ML decode are broken "at
+random" (`tmpInd=tmpInd(randperm(length(tmpInd),1))`), but MATLAB's `max()`
+already collapses to a single (first) index before that line runs, so the
+"random" selection is drawing from a length-1 list — a no-op. Ties always
+resolve to the first maximum in MATLAB's column-major linear order. Reproduced
+faithfully via `order='F'` (not genuine random tie-breaking) per goal 1.
+
+**Validation.** `bayesian_posterior` is bit-exact against a hand-computed
+Poisson PMF (`scipy.stats.poisson.pmf`, matches to 1e-6) and normalises exactly
+to 1. `spike_counts_per_window` matches hand-counted windows (including
+overlap) exactly, and Gaussian smoothing preserves total spike mass. The
+decisive check for `decode_maximum_likelihood`/`bayesian_posterior`: decoding
+**synthetic data with clean, non-periodic place fields and known ground
+truth** recovers position far better than chance (mean error 2.25 bins vs a
+~9.4-bin chance level on a 20x20 grid). Real r1838 data (via `crunch_decode`)
+decodes only modestly better than a naive chance baseline when using the
+documented grid cells (t2c1/t2c3) — this is very likely genuine
+neuroscience, not a bug: grid cells have multiple periodic firing fields, so
+their population activity is intrinsically ambiguous about *absolute*
+position (a well-documented real limitation), unlike the clean single-field
+synthetic case which decodes cleanly. The synthetic test is the real
+correctness proof; the real-data numbers are reported for context, not as a
+pass/fail bar.
+
+## 8. Things confirmed correct and bit-exact
 
 `.pos`/tetrode/`.cut` binary readers (big-endian, 216-byte spikes, 20-byte pos
 records); LED swap + speed filtering; NaN interpolation; 20-tap boxcar position

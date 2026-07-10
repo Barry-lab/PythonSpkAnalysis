@@ -14,6 +14,13 @@ consume. Typical use::
 from .core.recording import Electrode, Recording
 from .io.axona import load_dacq
 from .analysis._stats import nan_corr
+from .analysis.decoding import (
+    bayesian_posterior,
+    bayesian_posterior_with_prior,
+    crunch_decode,
+    decode_maximum_likelihood,
+    spike_counts_per_window,
+)
 from .analysis.direction import (
     circular_mean,
     directional_fft,
@@ -66,4 +73,9 @@ __all__ = [
     "nan_corr",
     "pxd",
     "place_by_direction",
+    "bayesian_posterior",
+    "bayesian_posterior_with_prior",
+    "spike_counts_per_window",
+    "decode_maximum_likelihood",
+    "crunch_decode",
 ]

@@ -1,6 +1,13 @@
 """Format-agnostic analyses that consume a Recording (or plain arrays)."""
 
 from ._stats import nan_corr
+from .decoding import (
+    bayesian_posterior,
+    bayesian_posterior_with_prior,
+    crunch_decode,
+    decode_maximum_likelihood,
+    spike_counts_per_window,
+)
 from .direction import (
     circular_mean,
     directional_fft,
@@ -43,4 +50,9 @@ __all__ = [
     "nan_corr",
     "pxd",
     "place_by_direction",
+    "bayesian_posterior",
+    "bayesian_posterior_with_prior",
+    "spike_counts_per_window",
+    "decode_maximum_likelihood",
+    "crunch_decode",
 ]
