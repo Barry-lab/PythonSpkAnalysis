@@ -124,10 +124,11 @@ def place_by_direction(recording, electrode, cluster,
     original assumes every direction bin has some dwell time).
 
     .. note::
-       Faithfully reproduces a bug in ``wrapper_pxd.m``: the spatial bin range
-       is computed as ``[max(y), max(y)]`` instead of ``[max(y), max(x)]`` (a
-       copy-paste error — the min-value row is correct). For a non-square
-       tracked window this mis-scales the X extent. See ``FINDINGS.md``.
+       ``wrapper_pxd.m`` used to have a copy-paste bug in the spatial bin
+       range: ``[max(y), max(y)]`` instead of ``[max(y), max(x)]`` (the
+       min-value row was always correct). **Fixed upstream** (for a
+       non-square tracked window, the bug mis-scaled the X extent used to
+       bin place x direction data). See ``FINDINGS.md``.
 
     Parameters
     ----------
@@ -156,11 +157,10 @@ def place_by_direction(recording, electrode, cluster,
 
     bin_px = (recording.pixels_per_metre / 100.0) * bin_cm
     max_y = float(np.max(recording.xy[:, 1]))
+    max_x = float(np.max(recording.xy[:, 0]))
     min_y = float(np.min(recording.xy[:, 1]))
     min_x = float(np.min(recording.xy[:, 0]))
-    # NB: reproduces wrapper_pxd.m's bug -- max_y used for BOTH the y and x
-    # max range (should be max_x for the third column); see docstring above.
-    data_ranges = np.array([[360.0, max_y, max_y], [0.0, min_y, min_x]])
+    data_ranges = np.array([[360.0, max_y, max_x], [0.0, min_y, min_x]])
     bin_size = np.array([dir_bin_deg, bin_px, bin_px])
 
     spk_dir_pos = np.column_stack([

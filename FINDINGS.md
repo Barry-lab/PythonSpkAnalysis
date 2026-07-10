@@ -163,12 +163,21 @@ the first analysis needing true 3-D (direction x posY x posX) binning — cross-
 checked against the existing validated 2-D binning inside `maps.py` and found
 **exactly identical** (max diff 0.0), so the new implementation is trustworthy.
 
-**A real bug in `wrapper_pxd.m`, faithfully reproduced.** The spatial bin range
-is built as `[max(y), max(y)]` instead of `[max(y), max(x)]` — a copy-paste
+**A real bug in `wrapper_pxd.m` — now fixed (2026-07-10, PI-approved,
+`python-port-bugfixes` branch, commit `019c685`).** The spatial bin range was
+built as `[max(y), max(y)]` instead of `[max(y), max(x)]` — a copy-paste
 error (the corresponding *min*-value row correctly uses `min(y)` then
-`min(x)`). For a non-square tracked window this mis-scales the X extent used
-for binning. Per goal 1, replicated exactly (see `place_by_direction()`'s
-docstring) rather than silently fixed.
+`min(x)`). For a non-square tracked window this mis-scaled the X extent used
+for binning. Initially replicated faithfully per goal 1 (see the git history
+of `place_by_direction()`'s docstring); fixed in both MATLAB and the Python
+port once the PI signed off. **Invisible on the shipped r1838 example
+trial** — its tracked window happens to be close to square (x: 0.3–446.9 px,
+y: 3.5–445.2 px), so `test_place_by_direction_on_example` shows no numeric
+change before/after. Added
+`test_place_by_direction_uses_correct_x_extent_on_non_square_window`, a
+synthetic 300×100 px window, to actually exercise the fix (asserts the
+x-axis bin count is more than double the y-axis count, which the
+max(y)-reused-for-x bug would have prevented).
 
 **Smoothing derivation worth recording.** `wrapper_pxd.m` smooths its two
 output marginals with ad hoc inline code (edge-corrected boxcar for the

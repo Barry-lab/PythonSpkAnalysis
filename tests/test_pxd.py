@@ -102,3 +102,35 @@ def test_place_by_direction_on_example(example_trial):
     hd = bl.head_direction_map(rec, 2, 3, bin_deg=6.0, smooth_size=3)
     both_d = np.isfinite(d) & np.isfinite(hd)
     assert np.corrcoef(d[both_d], hd[both_d])[0, 1] > 0.6
+
+
+def test_place_by_direction_uses_correct_x_extent_on_non_square_window():
+    # wrapper_pxd.m used to have a copy-paste bug where the spatial bin range
+    # used max(y) for BOTH the y and x extents -- invisible on the shipped
+    # example trial (whose tracked window happens to be near-square) so this
+    # deliberately non-square synthetic case is needed to actually exercise
+    # the fix. X spans 0-300, Y spans 0-100 -- a bug reusing max(y)=100 for
+    # the x extent would badly truncate the x-axis bin count/coverage.
+    import barrylab as bl
+    from barrylab.core.recording import Electrode, Recording
+
+    rng = np.random.RandomState(0)
+    n_pos = 4000
+    x = rng.uniform(0, 300, n_pos)
+    y = rng.uniform(0, 100, n_pos)
+    xy = np.column_stack([x, y])
+    direction = rng.uniform(0, 360, n_pos)
+
+    spk_idx = rng.choice(n_pos, size=300, replace=False)
+    elec = Electrode(identifier=1, spike_times=spk_idx / 50.0, pos_index=spk_idx,
+                     clusters=np.ones(300, dtype=int))
+    rec = Recording(name="synthetic", xy=xy, direction=direction,
+                    pos_sample_rate=50.0, pixels_per_metre=100.0,
+                    window=(0.0, 300.0, 0.0, 100.0), electrodes={1: elec})
+
+    p, d = bl.place_by_direction(rec, 1, 1, bin_cm=10.0)
+    ny, nx = p.shape
+    # x extent (300 px = 3 m = 30cm bins of 10cm) should give ~3x the number
+    # of x bins as the y extent (100 px = 1 m) -- NOT equal, which is what
+    # the max(y)-reused-for-x bug would have produced.
+    assert nx > ny * 2
