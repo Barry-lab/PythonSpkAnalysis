@@ -70,7 +70,8 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `eeg_instant_freq_power.m`, `detect_ripples.m` | — | **not yet ported** (`PORTING_PLAN.md` v0.6b, deferred) |
 | `fs_masterAnalysis.m` watershed step + `fs_fixWatershed.m` | `field_shuffle.watershed_fields(rate_map, occupancy)` | public — needs `barrylab[fieldshuffle]` |
 | `fs_binMembLoc.m` | `field_shuffle.field_bin_locations(labels, rate_map)` | public — needs `barrylab[fieldshuffle]` |
-| `fs_shufFields.m`, `fs_masterAnalysis.m`/`identify_grid_cell.m` orchestration | — | **not yet ported** (`PORTING_PLAN.md` v0.7, deferred) |
+| `fs_shufFields.m` | `field_shuffle.shuffle_fields(shape, field_bin_loc, static_bin, rng=...)` | public — involves genuine randomness, see docstring/`FINDINGS.md` |
+| `fs_masterAnalysis.m`/`identify_grid_cell.m` orchestration | — | **not yet ported** (`PORTING_PLAN.md` v0.7, in progress) |
 | 2-D FFT grid analysis, cross-SAC | — | **not yet ported** (`PORTING_PLAN.md` v0.5) |
 
 Everything marked *internal* runs inside `load_dacq`; you do not call it directly,

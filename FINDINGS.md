@@ -726,7 +726,78 @@ correction for at least one of the two methods (method 2 sometimes leaves
 the SAC unchanged even here, and method 1 shows the improvement) — consistent
 with, not contradicting, the source's own "doesn't always work" caveat.
 
-## 17. Things confirmed correct and bit-exact
+## 17. `fs_shufFields.m` -> `shuffle_fields`, v0.7 — the field-reallocation shuffle, plus a real MATLAB fragility
+
+Ported `fs_shufFields.m` into `field_shuffle.py::shuffle_fields`: randomly
+reallocates every watershed field's centre to a new bin, then works through
+each field's own member bins (in order of closeness to its own peak, with a
+random per-field rotational offset broken tie) placing each one at the
+closest still-available bin to the field's *new* centre (also with an
+independent random per-field rotational offset), processing all fields
+round-robin (one bin from each in turn) rather than one field fully before
+the next, so no single field can systematically monopolise the best
+positions.
+
+**Randomness means bit-exact comparison is categorically impossible here**,
+unlike everywhere else in this codebase — MATLAB's unseeded `rand`/`randperm`
+run a different RNG algorithm than anything numpy can reproduce, regardless
+of translation care. Given that, `shuffle_fields` operates throughout in
+0-based **row-major** (C-order) flat indices — matching
+`field_bin_locations`'s own established convention — rather than replicating
+MATLAB's 1-based column-major linear indices, since doing so would only add
+translation risk for zero validation benefit (the specific index-numbering
+scheme is an implementation detail; what's faithfully replicated is the
+algorithm's *logic*). Accepts a `numpy.random.RandomState` or seed for
+reproducibility, which MATLAB's own unseeded calls don't offer at all.
+
+**Two sort-key orders needed care and were double-checked against the
+source rather than assumed.** `sortrows(cell2mat(fldBinLoc(nn,4:5)),[2,1])`
+concatenates *(theta, radius)* as columns 1–2, so column-spec `[2,1]` sorts
+by radius (column 2) primary, theta (column 1) secondary — matching the
+code's own comment ("based first on dist to peak then orientation").
+`np.lexsort` takes its *last* key as primary, so this is
+`np.lexsort((theta, radius))`, not the more visually-obvious-looking
+`(radius, theta)` — got this backwards on a first draft and caught it by
+re-deriving the column order from `cell2mat`'s concatenation order rather
+than trusting an initial intuition, before writing any code.
+
+**A genuine MATLAB fragility found: silent output corruption when
+`staticBin` over-constrains the problem, faithfully preserved as a raised
+error instead.** If a field's ranked candidate-destination list is fully
+exhausted (every bin already claimed) before all its member bins are
+reallocated — which the greedy, first-available round-robin approach can
+hit even when *globally* there are exactly enough free bins overall, if
+another field's earlier greedy picks consumed more than its "fair share" —
+MATLAB's `find(vector,1)` returns `[]`, and `shufInds([])=x` is a silent
+no-op in MATLAB. That means MATLAB would quietly return an **incomplete or
+malformed permutation** (some bin's value never placed anywhere, its
+target slot left at the preallocated `0`) rather than fail loudly. Confirmed
+this is easy to trigger in a genuinely over-constrained synthetic case (two
+watershed fields tiling an entire small ratemap with no unlabelled
+background slack, plus a `staticBin` scattered evenly enough to leave zero
+give). Given the alternative is either a bare, uninformative `IndexError` or
+silently returning a corrupted permutation a caller might not notice,
+`shuffle_fields` raises an explicit `ValueError` instead — a case where
+"faithfully replicate" is served better by a loud failure than by
+reproducing MATLAB's specific silent-corruption mechanism (this is the same
+judgement call as `cross_sac_props`'s `<7`-peaks `ValueError`, see §15). In
+realistic usage (`staticBin` = genuinely unvisited bins, typically a modest
+and usually spatially-compact minority of a well-explored arena, not an
+adversarially-scattered majority) this should not arise.
+
+**Validation — structural, the only kind possible for a genuinely randomised
+algorithm.** Confirmed: the output is always a valid permutation of every
+bin (no bin lost or duplicated); static bins always stay exactly in place;
+identical results given the same seed (reproducibility); field centres are
+relocated to a different bin than their original position; and — the
+algorithm's actual stated purpose — bins belonging to a field remain
+clustered *around the field's own new centre* after reallocation rather than
+scattering across the whole map (checked quantitatively: mean post-shuffle
+distance from a field's own bins to its own new centre is well under half
+the map's diagonal, on a synthetic two-field case). Also runs end-to-end
+without error on the real, watershed-segmented r1838 grid cell.
+
+## 18. Things confirmed correct and bit-exact
 
 `.pos`/tetrode/`.cut` binary readers (big-endian, 216-byte spikes, 20-byte pos
 records); LED swap + speed filtering; NaN interpolation; 20-tap boxcar position

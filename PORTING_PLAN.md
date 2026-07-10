@@ -82,10 +82,10 @@ significance test). Niche `sacProps90deg` only if square-grid analysis is wanted
 `eeg_instant_freq_power`, `eeg_power_spectra`, `detect_ripples` (ripples require `.egf`). This is the
 only phase blocked on new infra; everything above is independent of it.
 
-**v0.7 — Watershed-gated FieldShuffle. STATUS: watershed decision RESOLVED (scikit-image added); segmentation stage (watershed_fields, field_bin_locations) DONE; fs_shufFields + orchestration still pending.**
-`fs_fixWatershed`, `fs_binMembLoc`, `fs_shufFields`, `fs_masterAnalysis`, `identify_grid_cell`. Blocked
-on a watershed segmentation decision (vendor one / add skimage / replace with peak+threshold). Last
-because it is a self-contained research sub-project with the heaviest single blocker.
+**v0.7 — Watershed-gated FieldShuffle. STATUS: segmentation (watershed_fields, field_bin_locations) DONE;
+fs_shufFields DONE (field_shuffle.py::shuffle_fields — genuine per-call randomness, validated
+structurally only, see FINDINGS.md); fs_masterAnalysis/identify_grid_cell orchestration in progress.**
+`fs_fixWatershed`, `fs_binMembLoc`, `fs_shufFields`, `fs_masterAnalysis`, `identify_grid_cell`.
 
 **Optional / parallel — extra loaders & viz.**
 `read_INP_file`, `read_stm_file`, `read_KwikRPi`, `write_cut_file`, and a `viz/` layer
@@ -161,11 +161,11 @@ vector (docstring says mean — averaging line is commented out); preserve, expo
 | `main_spatial_fft2` | `spatial_fft.py::grid_fft_components` | R | no | GF (deterministic parts) + seeded shuffle | useful |
 | `main_spatial_fft` (v1) | — | — | — | — | **skip (superseded by v2)** |
 | `fs_fastGridness` | `grid.py::fast_gridness` | A | no | SYN (hex-grid + real grid-cell ballpark cross-check vs `gridness`/`grid_properties`, see `FINDINGS.md`) | **DONE** |
-| `fs_fixWatershed` | `analysis/field_shuffle.py::fix_watershed` | A | **watershed** | STRUCT | useful (gated) |
-| `fs_binMembLoc` | `field_shuffle.py::bin_member_loc` | A | no | GF | useful (gated w/ shuffle) |
-| `fs_shufFields` | `field_shuffle.py::shuffle_fields` | A | **watershed** | seeded | useful (the novel algo) |
-| `fs_masterAnalysis` | `field_shuffle.py::field_shuffle_gridness` | R | **watershed** | seeded + real-cell GF | useful (gated) |
-| `identify_grid_cell` | `field_shuffle.py::is_grid_cell` | R | **watershed** | STRUCT | niche |
+| `fs_fixWatershed` | `analysis/field_shuffle.py::_fix_watershed` | A | **watershed** | STRUCT | **DONE** |
+| `fs_binMembLoc` | `field_shuffle.py::field_bin_locations` | A | no | GF | **DONE** |
+| `fs_shufFields` | `field_shuffle.py::shuffle_fields` | A | **watershed** | STRUCT (permutation validity, static-bin preservation, compactness-preservation; no bit-exact comparison possible — genuine per-call randomness, see `FINDINGS.md`) | **DONE** |
+| `fs_masterAnalysis` | `field_shuffle.py::field_shuffle_significance` | R | **watershed** | STRUCT + real-cell | in progress |
+| `identify_grid_cell` | `field_shuffle.py::is_grid_cell` | R | **watershed** | STRUCT | in progress |
 | `fs_findFields`, `main`, `wraper_scale_range`, `genSynData_*`, `interpRes_*`, `testRealData_*` | — | — | — | — | **skip** (drivers/scripts/superseded — see §5) |
 
 Cross-cutting MATLAB-isms (whole module): `imregionalmax`→`ndimage.maximum_filter(x,3)==x` + plateau
