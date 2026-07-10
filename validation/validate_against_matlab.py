@@ -2,7 +2,7 @@
 
 Loads the reference ``gridCell1838_t2c3_14-12-10.mat`` shipped with the MATLAB
 toolbox (the fully-loaded ``data`` struct plus the golden rate map ``smthRm``
-for tetrode 2, cluster 3), runs the barrelab port over the same raw trial, and
+for tetrode 2, cluster 3), runs the barrylab port over the same raw trial, and
 reports the discrepancy at every stage.
 
 What is proven bit-exact here (machine precision):
@@ -33,9 +33,9 @@ import scipy.io as sio
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "src"))
 
-from barrelab.io.axona import _read_pos, load_dacq  # noqa: E402
-from barrelab.analysis.maps import occupancy_map, rate_map, spike_map  # noqa: E402
-from barrelab.analysis.spatial import spatial_information  # noqa: E402
+from barrylab.io.axona import _read_pos, load_dacq  # noqa: E402
+from barrylab.analysis.maps import occupancy_map, rate_map, spike_map  # noqa: E402
+from barrylab.analysis.spatial import spatial_information  # noqa: E402
 
 REPO = "/Users/caswell/Documents/Git/Universal_Matlab"
 EX = os.path.join(REPO, "Read_Bin_Data", "Example_data")

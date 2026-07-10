@@ -1,9 +1,9 @@
-# Contributing to barrelab
+# Contributing to barrylab
 
 Thanks for helping build the lab's Python analysis toolbox. This guide covers how to
 set up a development environment, run the tests and the MATLAB validation harness, and
 the conventions we hold PRs to. The repo is `Barry-lab/PythonSpkAnalysis`; the import
-name is `barrelab`.
+name is `barrylab`.
 
 ## Development environment
 

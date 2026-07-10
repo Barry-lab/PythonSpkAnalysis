@@ -26,7 +26,7 @@ tetrode files `.1`, `.2`, ..., and the `.cut` cluster files). Point
 extension. It reads them all and returns a single `Recording`:
 
 ```python
-import barrelab as bl
+import barrylab as bl
 
 rec = bl.load_dacq("Universal_Matlab/Read_Bin_Data/Example_data/r1838_10-12-14/83812141")
 ```
@@ -124,4 +124,4 @@ You should see the tell-tale hexagonal firing lattice of a grid cell.
 Everything above runs off one `Recording`, and every analysis takes only a
 `Recording` — so the same code will work unchanged when the Neuropixels front
 end lands. Run `examples/quickstart.py <trial> 2 3` for the script version, and
-see the analysis modules in `src/barrelab/analysis/` for what else is ported.
+see the analysis modules in `src/barrylab/analysis/` for what else is ported.

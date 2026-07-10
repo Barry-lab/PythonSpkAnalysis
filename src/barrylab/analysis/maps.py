@@ -6,7 +6,7 @@ binning) and ``make_smooth_ratemap.m`` (smoothing with edge normalisation).
 then divides. Smoothing is configurable: a boxcar (default, 5 bins — the lab
 standard) or a Gaussian (by sigma), or none.
 
-All functions consume a :class:`~barrelab.core.recording.Recording` or plain
+All functions consume a :class:`~barrylab.core.recording.Recording` or plain
 arrays; none of them touch a file path.
 """
 

@@ -1,6 +1,6 @@
 # Architecture
 
-`barrelab` (imported as `import barrelab`; the repo is `Barry-lab/PythonSpkAnalysis`)
+`barrylab` (imported as `import barrylab`; the repo is `Barry-lab/PythonSpkAnalysis`)
 is a modern, validated successor to the lab's MATLAB `Universal_Matlab` toolbox. It
 reads historic Axona/DACQ tetrode data today and is built to grow into Neuropixels
 without rewriting a single line of analysis code. This document explains the design
@@ -17,7 +17,7 @@ RAW FILES  ->  FRONT-END LOADERS  ->  COMMON OBJECT  ->  ANALYSIS
   .N, .cut)     _position)                                adaptive_binning)
 ```
 
-- **Front-end loaders** (`src/barrelab/io/`) are the only code that knows about
+- **Front-end loaders** (`src/barrylab/io/`) are the only code that knows about
   byte layouts and file extensions. `load_dacq` (in `io/axona.py`) reads a DACQ
   trial via the internal `_read_pos`, `_read_tetrode` and `_read_cut` helpers plus
   the `_position` pipeline, and returns a filled `Recording`. A loader's *only*

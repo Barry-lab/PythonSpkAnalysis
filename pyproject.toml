@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "barrelab"
+name = "barrylab"
 version = "0.1.0"
 description = "Spatial-coding analysis for tetrode (DACQ) and Neuropixels recordings"
 readme = "README.md"
@@ -38,11 +38,11 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Barry-lab/barrelab"
-Source = "https://github.com/Barry-lab/barrelab"
+Homepage = "https://github.com/Barry-lab/PythonSpkAnalysis"
+Source = "https://github.com/Barry-lab/PythonSpkAnalysis"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/barrelab"]
+packages = ["src/barrylab"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

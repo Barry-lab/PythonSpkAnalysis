@@ -1,10 +1,10 @@
-"""barrelab — spatial-coding analysis for tetrode and Neuropixels recordings.
+"""barrylab — spatial-coding analysis for tetrode and Neuropixels recordings.
 
 Front-end loaders (DACQ today; Neuropixels/Open Ephys next) populate a common
-:class:`~barrelab.core.recording.Recording`, which the analysis functions
+:class:`~barrylab.core.recording.Recording`, which the analysis functions
 consume. Typical use::
 
-    import barrelab as bl
+    import barrylab as bl
 
     rec = bl.load_dacq("/data/r1838_10-12-14/83812141")
     rmap = bl.rate_map(rec, electrode=2, cluster=3)

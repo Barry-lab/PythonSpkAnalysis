@@ -2,7 +2,7 @@ function generate_fixtures(trialPath, tet, cell, outFile)
 % GENERATE_FIXTURES  Dump golden-master fixtures from the CURRENT MATLAB code.
 %
 % Run this in MATLAB with Universal_Matlab on the path to produce a reference
-% .mat that the Python regression suite (barrelab) validates against. Unlike the
+% .mat that the Python regression suite (barrylab) validates against. Unlike the
 % historic example .mat, this captures the *current* behaviour of read_DACQ.m,
 % postprocess_pos_data.m and make_smooth_ratemap.m, so it can bit-validate the
 % head-position weighting and the smoothing (see FINDINGS.md).

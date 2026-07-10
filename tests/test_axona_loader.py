@@ -4,7 +4,7 @@ import numpy as np
 
 
 def test_load_dacq_basic(example_trial):
-    import barrelab as bl
+    import barrylab as bl
 
     rec = bl.load_dacq(example_trial)
     assert rec.n_pos == 60050
@@ -16,7 +16,7 @@ def test_load_dacq_basic(example_trial):
 
 def test_position_pipeline_matches_matlab(example_trial, golden_mat):
     """xy / direction / speed reproduce MATLAB to machine precision (midpoint)."""
-    import barrelab as bl
+    import barrylab as bl
 
     g = golden_mat["data"].pos
     rec = bl.load_dacq(example_trial, head_pos_weighting="midpoint")
@@ -28,7 +28,7 @@ def test_position_pipeline_matches_matlab(example_trial, golden_mat):
 
 
 def test_spike_mapping_matches_matlab(example_trial, golden_mat):
-    import barrelab as bl
+    import barrylab as bl
 
     rec = bl.load_dacq(example_trial, head_pos_weighting="midpoint")
     elec = rec.electrode(2)
@@ -42,7 +42,7 @@ def test_spike_mapping_matches_matlab(example_trial, golden_mat):
 
 def test_binning_totals(example_trial, golden_mat):
     """Occupancy sums to duration; spikes sum to the cell's spike count."""
-    import barrelab as bl
+    import barrylab as bl
 
     rec = bl.load_dacq(example_trial, head_pos_weighting="midpoint")
     occ = bl.occupancy_map(rec)
@@ -57,7 +57,7 @@ def test_binning_totals(example_trial, golden_mat):
 
 def test_rate_map_smoothing_options(example_trial):
     """boxcar (default), gaussian and no-smoothing all produce valid maps."""
-    import barrelab as bl
+    import barrylab as bl
 
     rec = bl.load_dacq(example_trial)
     box = bl.rate_map(rec, 2, 3)                                   # default boxcar-5

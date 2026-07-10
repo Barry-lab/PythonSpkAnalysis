@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from barrelab.analysis.spatial import spatial_information
+from barrylab.analysis.spatial import spatial_information
 
 
 def test_spatial_information_hand_example():

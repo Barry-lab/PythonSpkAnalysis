@@ -134,7 +134,7 @@ def true_ppm_bounding_box(occupancy_bins, bin_size_px, env_size_m):
     Parameters
     ----------
     occupancy_bins : ndarray
-        Binned dwell time/counts (e.g. from :func:`~barrelab.analysis.maps.occupancy_map`);
+        Binned dwell time/counts (e.g. from :func:`~barrylab.analysis.maps.occupancy_map`);
         a bin is "visited" if its value is > 0.
     bin_size_px : float
         Bin size in camera pixels, as used to build ``occupancy_bins``.

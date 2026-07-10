@@ -49,7 +49,7 @@ def head_direction_map(recording, electrode, cluster, bin_deg=DIR_BIN_DEG,
                        smoothing="boxcar", smooth_size=DIR_SMOOTH_BINS):
     """Firing rate (Hz) as a function of head direction, for one cluster.
 
-    The directional analogue of :func:`~barrelab.analysis.maps.rate_map`:
+    The directional analogue of :func:`~barrylab.analysis.maps.rate_map`:
     occupancy and spikes are binned over direction and smoothed **circularly**
     (the ends wrap) before dividing.
 

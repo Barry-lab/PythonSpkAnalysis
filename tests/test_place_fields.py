@@ -2,13 +2,13 @@
 
 import numpy as np
 
-from barrelab.analysis._stats import nan_corr
-from barrelab.analysis.place_fields import (
+from barrylab.analysis._stats import nan_corr
+from barrylab.analysis.place_fields import (
     field_stats,
     spatial_coherence,
     spatial_correlation,
 )
-from barrelab.analysis.spatial import true_ppm_bounding_box
+from barrylab.analysis.spatial import true_ppm_bounding_box
 
 
 def test_nan_corr_basic_pearson():

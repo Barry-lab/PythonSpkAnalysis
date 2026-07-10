@@ -1,4 +1,4 @@
-# barrelab
+# barrylab
 
 Spatial-coding analysis for the Barry lab, in Python. A modern, validated
 successor to the [`Universal_Matlab`](https://github.com/Barry-lab/Universal_Matlab)
@@ -15,7 +15,7 @@ where to start.
 ## One glance
 
 ```python
-import barrelab as bl
+import barrylab as bl
 
 rec = bl.load_dacq("/data/r1838_10-12-14/83812141")   # any file of the trial
 rmap = bl.rate_map(rec, electrode=2, cluster=3)        # 2-D firing rate map (Hz)
@@ -37,7 +37,7 @@ Neuropixels/OpenEphys (SpikeInterface)      /   (spikes, xy,          info, grid
                                                  speed, dir, lfp)     HD tuning, decoding
 ```
 
-A loader's only job is to fill a [`Recording`](src/barrelab/core/recording.py).
+A loader's only job is to fill a [`Recording`](src/barrylab/core/recording.py).
 Every analysis consumes that object and nothing else, so a rate map does not
 care whether the spikes came from a 2010 tetrode or a 2026 Neuropixel.
 
@@ -56,7 +56,7 @@ Requires Python >= 3.9. Neuropixels and NWB support are optional extras
 ## Layout
 
 ```
-src/barrelab/
+src/barrylab/
   core/recording.py     the common Recording / Electrode objects
   io/
     _axona_files.py      byte-level Axona header + binary reader

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from barrelab.analysis.direction import (
+from barrylab.analysis.direction import (
     circular_mean,
     directional_fft,
     directionality,
@@ -87,7 +87,7 @@ def test_directional_fft_detects_six_cycle():
 
 
 def test_head_direction_map_on_example(example_trial):
-    import barrelab as bl
+    import barrylab as bl
 
     rec = bl.load_dacq(example_trial)
     tc = head_direction_map(rec, 2, 3)

@@ -1,7 +1,7 @@
 """Axona / DACQ front-end loader.
 
 ``load_dacq`` reads a raw DACQ trial (a set of files sharing one basename) and
-returns a :class:`~barrelab.core.recording.Recording`. It ports the master
+returns a :class:`~barrylab.core.recording.Recording`. It ports the master
 ``read_DACQ.m`` and the per-file readers ``read_pos_file.m``,
 ``read_tetrode_file.m`` and ``read_cut_file.m``.
 
@@ -126,10 +126,10 @@ def load_dacq(path, load_position=True,
     load_position
         If ``True`` read and post-process the ``.pos`` file.
     max_speed, box_car
-        Position-processing parameters (see :mod:`barrelab.params`).
+        Position-processing parameters (see :mod:`barrylab.params`).
     head_pos_weighting : {"tracking", "midpoint"}
         Two-LED head-position convention; see
-        :func:`barrelab.io._position.postprocess_pos_data`.
+        :func:`barrylab.io._position.postprocess_pos_data`.
 
     Returns
     -------

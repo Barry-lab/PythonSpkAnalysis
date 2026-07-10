@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from barrelab.analysis.maps import _histnd_2d, smooth_ratemap
+from barrylab.analysis.maps import _histnd_2d, smooth_ratemap
 
 
 def test_histnd_basic_counts():

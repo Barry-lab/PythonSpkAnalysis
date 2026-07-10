@@ -1,7 +1,7 @@
 # Migrating from `Universal_Matlab`
 
-If you know the lab's MATLAB toolbox, you already know `barrelab`. The analyses
-are the same; only the packaging changed. `barrelab` is a modern, validated
+If you know the lab's MATLAB toolbox, you already know `barrylab`. The analyses
+are the same; only the packaging changed. `barrylab` is a modern, validated
 Python successor that reads the same historic Axona/DACQ data and is built to
 grow into Neuropixels without rewriting your analysis code. Where a function was
 ported, its numerics were checked against MATLAB output rather than merely for
@@ -15,7 +15,7 @@ object to every analysis. A rate map does not care whether the spikes came from 
 
 ## Function map
 
-| `Universal_Matlab` | `barrelab` | Notes |
+| `Universal_Matlab` | `barrylab` | Notes |
 |---|---|---|
 | `read_DACQ.m` | `load_dacq(path)` | public entry point |
 | `read_pos_file.m` | `io.axona._read_pos` | internal (via `load_dacq`) |
@@ -29,7 +29,7 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `easy_make_ratemap.m` | `rate_map(recording, electrode, cluster)` | public |
 | `skaggsInfo.m` | `spatial_information(rates, dwell_times)` | public |
 | `skaggsAdaptiveBinning.m` | `adaptive_binning(dwell_times, spikes, alpha=200)` | public |
-| `default_vars.m` | `barrelab.params` | subset ported so far |
+| `default_vars.m` | `barrylab.params` | subset ported so far |
 | `xPearson.m` (`Analysis_General`) | `spatial_autocorrelogram(rate_map)` | public — the SAC |
 | `multiGridness.m` | `gridness(sac)` → `(standard, expanding)` | public |
 | `sacProps.m` | `grid_properties(sac)` | public — scale/orientation/peaks |
@@ -72,10 +72,10 @@ rm   = easy_make_ratemap(data, 2, 3);         % tetrode 2, cluster 3
 info = skaggsInfo(rm, bin_data(data, 'dwell'));
 ```
 
-**barrelab**
+**barrylab**
 
 ```python
-import barrelab as bl
+import barrylab as bl
 
 rec  = bl.load_dacq("/data/r1838/83812141")
 rm   = bl.rate_map(rec, electrode=2, cluster=3)     # 5-bin boxcar by default
@@ -98,7 +98,7 @@ choices about convention, not correctness.
 
 1. **Head-position weighting.** The current `postprocess_pos_data.m` combines the
    two LEDs with a *tracking-fraction weighted* mean (`head_pos_weighting=
-   "tracking"`, the `barrelab` default), whereas the fixture used a plain
+   "tracking"`, the `barrylab` default), whereas the fixture used a plain
    **midpoint**. Pass `load_dacq(..., head_pos_weighting="midpoint")` to reproduce
    the legacy fixture exactly. For this trial the back LED is tracked only ~53% of
    the time, so the conventions can differ by up to ~1 bin.

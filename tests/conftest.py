@@ -4,7 +4,7 @@ Golden-master tests need the example DACQ trial + reference ``.mat`` that ship
 with the MATLAB ``Universal_Matlab`` repo. If they are not found (e.g. in CI
 without the data) those tests skip; the synthetic invariant tests always run.
 
-Point ``BARRELAB_EXAMPLE_DATA`` at the ``Example_data`` directory to enable them.
+Point ``BARRYLAB_EXAMPLE_DATA`` at the ``Example_data`` directory to enable them.
 """
 
 import os
@@ -16,7 +16,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 _CANDIDATES = [
-    os.environ.get("BARRELAB_EXAMPLE_DATA", ""),
+    os.environ.get("BARRYLAB_EXAMPLE_DATA", ""),
     "/Users/caswell/Documents/Git/Universal_Matlab/Read_Bin_Data/Example_data",
 ]
 

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from barrelab.analysis.grid import (
+from barrylab.analysis.grid import (
     gridness,
     grid_properties,
     spatial_autocorrelogram,
@@ -74,7 +74,7 @@ def test_gridness_of_blob_is_not_high():
 
 def test_gridness_discriminates_example_grid_cells(example_trial):
     """The example README lists t2c1 and t2c3 as grid cells, t2c4/t2c5 as not."""
-    import barrelab as bl
+    import barrylab as bl
 
     rec = bl.load_dacq(example_trial)
     grid_cells = {cl: bl.grid_score(rec, 2, cl)[0] for cl in (1, 3)}

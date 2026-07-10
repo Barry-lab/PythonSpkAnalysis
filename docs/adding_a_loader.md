@@ -1,6 +1,6 @@
 # Adding a new front-end loader
 
-barrelab has three strict layers:
+barrylab has three strict layers:
 
 ```
 RAW FILES  ->  FRONT-END LOADERS (io/)  ->  COMMON OBJECT (core/Recording)  ->  ANALYSIS (analysis/)
@@ -19,8 +19,8 @@ same one.
 ## The loader contract
 
 A loader is a plain function (or class) that returns a
-`barrelab.core.recording.Recording`. It fills the following fields. Reading
-`src/barrelab/io/axona.py` alongside this list shows exactly how `load_dacq`
+`barrylab.core.recording.Recording`. It fills the following fields. Reading
+`src/barrylab/io/axona.py` alongside this list shows exactly how `load_dacq`
 does it.
 
 | Field | Type | Meaning | Optional? |
@@ -105,6 +105,6 @@ and does not exist yet.
    the loaded numbers against the acquisition system's own tools (e.g.
    SpikeInterface / ephysiopy for Neuropixels) rather than only internal
    consistency.
-4. **Register it.** Add the function to `src/barrelab/io/__init__.py` (its
-   `__all__`) and re-export it from `src/barrelab/__init__.py` so users can
-   `from barrelab import load_neuropixels`.
+4. **Register it.** Add the function to `src/barrylab/io/__init__.py` (its
+   `__all__`) and re-export it from `src/barrylab/__init__.py` so users can
+   `from barrylab import load_neuropixels`.

@@ -16,7 +16,7 @@ light). The fixture's `data.pos.xy` was made with a plain **midpoint** of the tw
 LEDs — our port matches that to 1e-13. For this trial the back LED is tracked only
 53% of the time, so the two conventions differ by up to ~8 px (~1 bin).
 
-- `barrelab` implements both via `load_dacq(..., head_pos_weighting=...)`.
+- `barrylab` implements both via `load_dacq(..., head_pos_weighting=...)`.
 - Default is `"tracking"` (faithful to the current repo). `"midpoint"` reproduces
   the fixture / legacy behaviour.
 - **Question for the PI:** which is canonical going forward? The weighted mean is

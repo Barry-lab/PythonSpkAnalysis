@@ -1,11 +1,11 @@
-# barrelab — Master Porting Plan
+# barrylab — Master Porting Plan
 
-Porting the Barry lab MATLAB toolbox (`Universal_Matlab`) to the Python package **barrelab**.
+Porting the Barry lab MATLAB toolbox (`Universal_Matlab`) to the Python package **barrylab**.
 Architecture: `io/` loaders fill a `core/Recording` → `analysis/` pure functions consume a Recording or
 NumPy arrays and never touch disk.
 
 Current package layout (for module-home mapping below):
-`src/barrelab/io/axona.py`, `core/recording.py`, `analysis/{maps,spatial,grid,direction}.py`.
+`src/barrylab/io/axona.py`, `core/recording.py`, `analysis/{maps,spatial,grid,direction}.py`.
 New analysis modules proposed here (`place_fields`, `pxd`, `decoding`, `line_trajectory`,
 `grid_ellipse`, `spatial_fft`, `lfp`, `field_shuffle`, `_stats`) are additive.
 
@@ -93,7 +93,7 @@ Consumes = **R** (Recording) or **A** (arrays). Oracle: **GF** = golden fixture 
 **STRUCT** = structural only; **MAT** = shipped `.mat` oracle.
 
 ### Analysis_Dir — head direction
-| function | barrelab target | consumes | needs-infra | oracle | priority |
+| function | barrylab target | consumes | needs-infra | oracle | priority |
 |---|---|---|---|---|---|
 | `cb_circMean` | `analysis/direction.py::circular_mean` | A | no | GF+SYN | core |
 | `kldiv` | use `scipy.stats.entropy(base=2)` (don't port verbatim; keep sym/js only if needed) | A | no | SYN | skip/superseded |
@@ -107,7 +107,7 @@ Watch-points: `circular_mean` returns `[0,2π)` vs CircStats `(-π,π]` — `led
 base-2 (bits). `imfilter 'symmetric'`→ndimage `reflect`, `'circular'`→`wrap`.
 
 ### Analysis_Freq — theta / LFP
-| function | barrelab target | consumes | needs-infra | oracle | priority |
+| function | barrylab target | consumes | needs-infra | oracle | priority |
 |---|---|---|---|---|---|
 | `getegf` (+ `.egf` reader) | `io/axona.py::_read_egf` | path | **YES (lfp)** | GF | core (infra) |
 | `eeg_convert_to_volts` | `io/axona.py::_eeg_to_volts` | A+meta | **YES (lfp)** | SYN+GF | core (infra) |
@@ -122,7 +122,7 @@ Bugs to fix on port: `getegf` decimate factor vs comment (code wins: /4, /2 defa
 multiples (parametrise on `pos_sample_rate`).
 
 ### Analysis_Spatial_Field — place-field / spatial stats
-| function | barrelab target | consumes | needs-infra | oracle | priority |
+| function | barrylab target | consumes | needs-infra | oracle | priority |
 |---|---|---|---|---|---|
 | `pcFieldStats` | `analysis/place_fields.py::field_stats` | A | no | GF+SYN | useful |
 | `spatialCoherance` | `place_fields.py::spatial_coherence` | A | no | GF (matches Tint) | useful |
@@ -139,7 +139,7 @@ vector (docstring says mean — averaging line is commented out); preserve, expo
 `bwlabel(_,4)`→`scipy.ndimage.label` with 4-conn structure.
 
 ### Analysis_Grid — remaining
-| function | barrelab target | consumes | needs-infra | oracle | priority |
+| function | barrylab target | consumes | needs-infra | oracle | priority |
 |---|---|---|---|---|---|
 | `gridEllipse_fit` | `analysis/grid_ellipse.py::fit_grid_ellipse` | A | no | GF | useful |
 | `gridEllipse_correct` | `grid_ellipse.py::regularise_elliptic_sac` | A | no | GF | useful |
@@ -167,7 +167,7 @@ collapse via `label`+`center_of_mass`; `imrotate` is CCW-positive vs scipy `rota
 `scipy.ndimage` except watershed.
 
 ### Decoding
-| function | barrelab target | consumes | needs-infra | oracle | priority |
+| function | barrylab target | consumes | needs-infra | oracle | priority |
 |---|---|---|---|---|---|
 | `decode_calcPost` | `analysis/decoding.py::bayesian_posterior` | A | no | GF (bit-exact) | core |
 | `decode_getSpkCnt` | `decoding.py::spike_counts_per_window` | A | no | GF | core |
@@ -188,7 +188,7 @@ MATLAB round-half-away vs numpy round-half-even, and a latent overlap inconsiste
 reshapes pos contiguously → mis-assigns true position for overlapping windows).
 
 ### Read_Bin_Data + Analysis_General — loaders & misc
-| function | barrelab target | consumes | needs-infra | oracle | priority |
+| function | barrylab target | consumes | needs-infra | oracle | priority |
 |---|---|---|---|---|---|
 | `read_eeg_file` | `io/axona.py::_read_eeg` | path | **YES (lfp field)** | GF | core (unblocks theta) |
 | *EGF reader* (no `.m` here) | `io/axona.py::_read_egf` | path | **YES (lfp field)** | GF/STRUCT | useful (write fresh) |
