@@ -38,6 +38,7 @@ from .analysis.grid import (
     grid_score,
     gridness,
     spatial_autocorrelogram,
+    square_grid_props,
 )
 from .analysis.grid_ellipse import brandon_regularise, fit_grid_ellipse, regularise_elliptic_sac
 from .analysis.grid_phase import cross_sac_props
@@ -73,6 +74,7 @@ __all__ = [
     "fast_gridness",
     "cross_correlogram",
     "cross_sac_props",
+    "square_grid_props",
     "head_direction_map",
     "head_direction_stats",
     "directional_occupancy",

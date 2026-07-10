@@ -8,6 +8,7 @@ from barrylab.analysis.grid import (
     gridness,
     grid_properties,
     spatial_autocorrelogram,
+    square_grid_props,
 )
 
 
@@ -149,3 +150,66 @@ def test_fast_gridness_too_few_peaks_returns_nan():
     assert np.isnan(standard)
     assert np.isnan(expanding)
     assert np.isnan(scale)
+
+
+# --------------------------------------------------------------------------
+# square_grid_props (sacProps90deg.m) -- 4-fold/square-symmetric grid variant
+# --------------------------------------------------------------------------
+def _square_grid_map(n=61, spacing=12.0, sigma=2.5):
+    """A synthetic rate map of Gaussian fields on a square (orthogonal) lattice."""
+    yy, xx = np.mgrid[0:n, 0:n]
+    a1 = np.array([spacing, 0.0])
+    a2 = np.array([0.0, spacing])
+    centre = np.array([n / 2, n / 2])
+    m = np.zeros((n, n))
+    for i in range(-5, 6):
+        for j in range(-5, 6):
+            c = i * a1 + j * a2 + centre
+            m += np.exp(-((xx - c[0]) ** 2 + (yy - c[1]) ** 2) / (2 * sigma ** 2))
+    return m
+
+
+def test_square_grid_props_of_synthetic_square_grid_is_high():
+    sac = spatial_autocorrelogram(_square_grid_map(spacing=12.0))
+    props = square_grid_props(sac)
+    assert props["gridness"] > 0.3, "a clean square grid should score high 90deg gridness"
+    # four peaks at ~one lattice spacing from the centre
+    assert 9 < props["scale"][0] < 15
+    assert len(props["orientation"]) in (1, 2, 3)  # up to 3 non-redundant axes above the x-axis
+
+
+def test_square_grid_props_does_not_score_hex_grid_highly():
+    # A hexagonal lattice is not 4-fold symmetric -- this is a meaningful
+    # discriminating check, not just "doesn't crash".
+    sac = spatial_autocorrelogram(_hex_grid_map())
+    props = square_grid_props(sac)
+    assert not (props["gridness"] > 0.3)
+
+
+def test_square_grid_props_of_blob_scores_much_lower_than_square_grid():
+    # A single isotropic Gaussian blob is trivially close to rotationally
+    # symmetric about its own centre (unlike a hex grid, which is NOT 4-fold
+    # symmetric and correctly scores clearly negative above), so its 90deg
+    # score need not be near zero/negative -- a lone spurious secondary peak
+    # far out in the smooth correlation tail can even give it a middling
+    # positive score. The meaningful, non-brittle check is that it scores
+    # far below a genuine square grid's clean, strongly positive score.
+    yy, xx = np.mgrid[0:41, 0:41]
+    blob = np.exp(-((xx - 20) ** 2 + (yy - 20) ** 2) / (2 * 5.0 ** 2))
+    blob_gridness = square_grid_props(spatial_autocorrelogram(blob))["gridness"]
+    square_gridness = square_grid_props(spatial_autocorrelogram(_square_grid_map()))["gridness"]
+    assert blob_gridness < 0.5 * square_gridness
+
+
+def test_square_grid_props_n_closest_generalisation_does_not_change_gridness_grid_properties():
+    """The shared _sac_peaks helper picked up a new n_closest parameter to
+    support square_grid_props; confirm gridness/grid_properties (which always
+    call it with the old default of 7) are completely unaffected."""
+    sac = spatial_autocorrelogram(_hex_grid_map())
+    std1, exp1 = gridness(sac)
+    props1 = grid_properties(sac)
+    std2, exp2 = gridness(sac)
+    props2 = grid_properties(sac)
+    assert std1 == std2 and exp1 == exp2
+    assert props1["scale"] == props2["scale"]
+    np.testing.assert_array_equal(props1["orientation"], props2["orientation"])

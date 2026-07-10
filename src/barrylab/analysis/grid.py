@@ -11,11 +11,15 @@ Ports the lab's grid-cell canon from ``Universal_Matlab/Analysis_Grid`` (and
   peak r (``sacProps.m``).
 - :func:`grid_score` — convenience: rate map -> SAC -> standard gridness.
 - :func:`fast_gridness` — a leaner, DISTINCT standard/expanding-gridness
-  implementation used inside the (not yet ported) FieldShuffle significance
-  loop (``fs_fastGridness.m``, Langston et al. 2011). Not a duplicate of
+  implementation used inside the FieldShuffle significance loop
+  (``fs_fastGridness.m``, Langston et al. 2011; see
+  :mod:`barrylab.analysis.field_shuffle`). Not a duplicate of
   :func:`gridness`/:func:`grid_properties` — see its docstring for several
   confirmed algorithmic divergences from ``multiGridness.m``, faithfully
   preserved rather than reconciled.
+- :func:`square_grid_props` — a 4-fold/square-symmetric analogue of
+  :func:`grid_properties`/:func:`gridness` for non-hexagonal grids
+  (``sacProps90deg.m``).
 
 The MATLAB image-processing calls (``imregionalmax``, ``bwlabel``,
 ``regionprops``, ``imrotate``) are reproduced with ``scipy.ndimage`` so no
@@ -32,6 +36,7 @@ from .maps import rate_map
 
 _EIGHT = np.ones((3, 3))  # 8-connectivity structuring element
 _ROT_ANGLES = (60, 120, 30, 90, 150)
+_ROT_ANGLES_90 = (90, 45, 135)  # square/4-fold-symmetric grid variant (sacProps90deg.m)
 
 
 # --------------------------------------------------------------------------
@@ -129,8 +134,13 @@ def cross_correlogram(rate_map_a, rate_map_b, min_overlap=None):
 # --------------------------------------------------------------------------
 # Peak finding on the SAC (shared by sacProps.m and multiGridness.m)
 # --------------------------------------------------------------------------
-def _sac_peaks(sac):
+def _sac_peaks(sac, n_closest=7):
     """Find the central peak and its closest neighbours in a SAC.
+
+    ``n_closest`` is the number of nearest-to-centre peaks to keep (7 =
+    centre + 6 hexagonal neighbours, matching ``sacProps.m``/``multiGridness.m``;
+    :func:`square_grid_props` passes 5 = centre + 4 for a square/4-fold grid,
+    matching ``sacProps90deg.m``).
 
     Returns a dict of peak geometry, or ``None`` if no positive peak is found.
     Coordinates follow MATLAB's 1-based, y-down convention for the geometry;
@@ -154,7 +164,7 @@ def _sac_peaks(sac):
     dist = np.sqrt((xy_central ** 2).sum(axis=1))
 
     order = np.argsort(dist)
-    closest = order[:7] if len(order) >= 7 else order
+    closest = order[:n_closest] if len(order) >= n_closest else order
     return {
         "filled": filled,
         "central": (cy, cx),
@@ -307,6 +317,115 @@ def grid_score(recording, electrode, cluster, bin_cm=2.0, smoothing="boxcar",
     sac = spatial_autocorrelogram(rm, min_overlap=min_overlap)
     props = grid_properties(sac)
     return props["gridness"], props["scale"] * bin_cm
+
+
+# --------------------------------------------------------------------------
+# Square/4-fold-symmetric grid variant (sacProps90deg.m)
+# --------------------------------------------------------------------------
+def _rotational_gridness_90(sac_filled, mask):
+    """90-degree-symmetry gridness over a mask: corr(90) - max(corr(45), corr(135)).
+
+    The square-grid analogue of :func:`_rotational_gridness`'s 60/120-vs-
+    30/90/150 hexagonal split.
+    """
+    sel_a = sac_filled[mask]
+    corrs = []
+    for angle in _ROT_ANGLES_90:
+        rot = rotate(sac_filled, angle, reshape=False, order=1, mode="constant", cval=0.0)
+        sel_b = rot[mask]
+        valid = np.isfinite(sel_a) & np.isfinite(sel_b)
+        if valid.sum() < 2:
+            corrs.append(np.nan)
+        else:
+            corrs.append(np.corrcoef(sel_a[valid], sel_b[valid])[0, 1])
+    # MATLAB: gridness = min(rotatedCorr(1)) - max(rotatedCorr([2,3])) --
+    # min() of the single 90-degree value is a no-op; np.fmax matches
+    # MATLAB max()'s NaN-ignoring semantics for the 45/135 pair (the same
+    # recurring gotcha handled throughout this project, e.g. _brandon_gridness).
+    return corrs[0] - np.fmax(corrs[1], corrs[2])
+
+
+def square_grid_props(sac):
+    """Square/4-fold-symmetric grid metrics from a SAC. Port of ``sacProps90deg.m``.
+
+    A variant of :func:`grid_properties`/:func:`gridness` for grids with
+    4-fold (square -- e.g. some trained-network grid cells) rather than
+    6-fold (hexagonal) symmetry: looks for the 4 peaks closest to the SAC
+    centre (not 6), and measures gridness as the correlation at a 90-degree
+    rotation minus the maximum correlation at 45/135 degrees (instead of the
+    usual min(60,120) minus max(30,90,150) hexagonal split).
+
+    Uses the *same* peak-detection convention as :func:`grid_properties`/
+    :func:`gridness` (``multiGridness.m``/``sacProps.m``: ``imregionalmax``
+    restricted to positive SAC bins, one candidate per connected plateau) --
+    confirmed by direct inspection of ``sacProps90deg.m``, NOT the
+    "raw"/unrestricted convention used by :func:`fast_gridness`/
+    :func:`~barrylab.analysis.grid_phase.cross_sac_props`/
+    :func:`~barrylab.analysis.grid_ellipse.brandon_regularise`.
+
+    Parameters
+    ----------
+    sac : ndarray
+        A spatial autocorrelogram (from :func:`spatial_autocorrelogram`).
+
+    Returns
+    -------
+    dict with keys:
+        ``scale`` -- array (up to 5,): mean distance of the up-to-4 central
+            peaks from the centre (element 0), then each peak's own distance
+            (``[nan]`` if only the central peak was found).
+        ``gridness`` -- scalar 90-degree gridness (``nan`` if fewer than 2
+            peaks found).
+        ``orientation`` -- sorted axis orientations (deg CCW from +x) of
+            peaks above the x-axis (``[nan]`` if only the central peak was
+            found).
+        ``peak_coord`` -- (n, 2) peak positions as (x, y), origin top-left.
+    """
+    peaks = _sac_peaks(sac, n_closest=5)
+    if peaks is None:
+        return {"scale": np.array([np.nan]), "gridness": float("nan"),
+                "orientation": np.array([np.nan]), "peak_coord": np.empty((0, 2))}
+
+    filled = peaks["filled"]
+    dist = peaks["dist"]
+    if dist.size > 1:
+        scale = np.concatenate(([float(np.mean(dist[1:]))], dist[1:]))
+    else:
+        scale = np.array([np.nan])
+
+    if len(peaks["label_ids"]) == 1:  # only the central peak found (numPeaks==1)
+        orientation = np.array([np.nan])
+    else:
+        xy = peaks["xy_central"]
+        theta = np.arctan2(-xy[:, 1], xy[:, 0])  # y negated: image y-down frame
+        keep = theta >= 0
+        keep[0] = False  # drop the central point
+        orientation = np.degrees(np.sort(theta[keep]))
+
+    if len(peaks["label_ids"]) < 2:
+        gridness90 = float("nan")
+    else:
+        field = _peak_fields(filled, peaks)
+        cy, cx = peaks["central"]
+        yy, xx = np.mgrid[1:filled.shape[0] + 1, 1:filled.shape[1] + 1]
+        centre_radi = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2)
+        max_allow = int(np.min(np.floor(np.array(filled.shape) / 2.0)))
+        central_id = peaks["label_ids"][0]
+
+        # Disc mask out to the furthest edge of the (up-to-4) fields' extent
+        # -- identical construction to gridness()'s "standard" mask.
+        outer = 0.0
+        for pid in peaks["label_ids"]:
+            m = field == pid
+            if m.any():
+                outer = max(outer, centre_radi[m].max())
+        outer = min(outer, max_allow)
+        mask = (centre_radi <= outer) & (field != central_id)
+        gridness90 = _rotational_gridness_90(filled, mask)
+
+    peak_coord = np.column_stack([peaks["peak_rc"][:, 1] + 1, peaks["peak_rc"][:, 0] + 1])
+    return {"scale": scale, "gridness": gridness90, "orientation": orientation,
+            "peak_coord": peak_coord}
 
 
 # --------------------------------------------------------------------------

@@ -18,7 +18,7 @@ from .direction import (
     led2v1_dir_offset,
     resultant_vector,
 )
-from .grid import grid_properties, grid_score, gridness, spatial_autocorrelogram
+from .grid import grid_properties, grid_score, gridness, spatial_autocorrelogram, square_grid_props
 from .grid_ellipse import fit_grid_ellipse, regularise_elliptic_sac
 from .lfp import power_spectrum
 from .maps import occupancy_map, rate_map, smooth_ratemap, spike_map
@@ -40,6 +40,7 @@ __all__ = [
     "gridness",
     "grid_properties",
     "grid_score",
+    "square_grid_props",
     "head_direction_map",
     "head_direction_stats",
     "directional_occupancy",
