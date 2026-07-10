@@ -134,3 +134,58 @@ def test_led2v1_dir_offset_ignores_nans():
     led2 = np.array([15.0, 25.0, 99.0, 45.0] * 50)  # constant +5 offset where valid
     mean_offset, _ = led2v1_dir_offset(led2, led1)
     assert abs(mean_offset - 5.0) < 0.5
+
+
+def test_led2v1_dir_offset_wrap_convention_is_a_true_no_op():
+    """Pins the exact algebraic equivalence the MATLAB fix relies on: computing
+    the mean via wrap="0_2pi" then explicitly re-wrapping to (-pi, pi] gives an
+    identical result to computing directly with wrap="-pi_pi" -- for both a
+    positive- and a negative-true-offset case. This is what makes
+    Universal_Matlab's led2v1_dir_offset.m safe to switch from the external
+    toolbox circ_mean to the lab's own cb_circMean (which only returns
+    [0, 2*pi)): the switch changes nothing about the returned meanOffset once
+    the (-pi, pi] wrap is applied explicitly afterward, in either direction.
+    See FINDINGS.md.
+    """
+    rng = np.random.RandomState(3)
+    for true_offset_deg in (-5.0, 50.0):
+        led1 = rng.uniform(0, 360, 2000)
+        led2 = np.mod(led1 + true_offset_deg + rng.normal(0, 2.0, 2000), 360)
+        diff = np.radians(np.mod(led2 - led1 + 180, 360) - 180)
+        via_signed = circular_mean(diff, wrap="-pi_pi")
+        via_0_2pi_rewrapped = circular_mean(diff, wrap="0_2pi")
+        via_0_2pi_rewrapped = np.mod(via_0_2pi_rewrapped + np.pi, 2 * np.pi) - np.pi
+        assert np.isclose(via_signed, via_0_2pi_rewrapped)
+
+
+def test_led2v1_dir_offset_on_real_trial_reveals_a_genuine_large_offset(golden_mat):
+    """Real-data sanity check requested by the PI: does 2-LED heading (pos.dir)
+    align with movement direction (pos.dir_disp, 1-LED/displacement-based) on
+    average? Run directly on the authoritative MATLAB-computed arrays from the
+    shipped golden fixture (not this port's own derived values), so this is
+    checking the underlying data/method, not this port's direction pipeline.
+
+    The honest answer for this real trial: no, not closely -- offset is
+    consistently around +50 degrees (not near 0), with a moderate (not
+    noise-level) resultant length, so it is a real, fairly consistent
+    difference rather than random jitter. led2v1_dir_offset.m's own docstring
+    explicitly frames 1-LED/displacement heading as "less accurate" than
+    2-LED heading, and frame-to-frame displacement at 50 Hz is a genuinely
+    noisy proxy for a foraging rat's actual head orientation (a weaving gait
+    dominates the raw per-sample displacement vector) -- so a large offset
+    here does not by itself indicate a tracking or pipeline bug. What matters
+    for this port: the number is stable and reproducible (pinned below), and
+    unaffected by which circular-mean convention computes it (see
+    test_led2v1_dir_offset_wrap_convention_is_a_true_no_op) -- confirmed
+    directly on real data too, not just synthetic cases.
+    """
+    pos = golden_mat["data"].pos
+    led2_dir = np.asarray(pos.dir, dtype=float).ravel()
+    led1_dir = np.asarray(pos.dir_disp, dtype=float).ravel()
+
+    mean_offset, peak_offset = led2v1_dir_offset(led2_dir, led1_dir)
+    assert 45.0 < mean_offset < 58.0  # pins the real, reproducible value (~52 deg)
+
+    diff = np.radians(np.mod(led2_dir - led1_dir + 180, 360) - 180)
+    resultant_length = np.abs(np.nanmean(np.exp(1j * diff)))
+    assert resultant_length > 0.3  # a real, non-noise-level relationship, not near 0

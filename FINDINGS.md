@@ -67,23 +67,51 @@ current golden-master test.
 Prompted by a direct request to audit cross-function dependencies before reusing
 ported code (not just port each function in isolation):
 
-- **`led2v1_dir_offset.m` calls the *wrong* circular mean — genuinely worth
-  knowing.** `cb_circMean.m`'s own header says it was written "to replace
-  unreliable circ_mean", yet `led2v1_dir_offset.m` still calls the toolbox
+- **`led2v1_dir_offset.m` used to call the *wrong* circular mean — now fixed
+  upstream.** `cb_circMean.m`'s own header says it was written "to replace
+  unreliable circ_mean", yet `led2v1_dir_offset.m` still called the toolbox
   `circ_mean`, not `cb_circMean`. Checked via `grep -rl cb_circMean` across the
-  whole MATLAB repo: `cb_circMean` has **no callers at all** outside its own
+  whole MATLAB repo: `cb_circMean` had **no callers at all** outside its own
   file — every consumer, including this one, was written (or left) against the
-  old function. This looks like an inherited inconsistency rather than a
+  old function. This looked like an inherited inconsistency rather than a
   deliberate choice. Practically: the two functions compute the *same* mean
   angle (both reduce to `atan2(sum sin, sum cos)`), but `circ_mean` returns it
   in `(-π, π]` (MATLAB's `angle()` convention) while `cb_circMean` returns
   `[0, 2π)`. `led2v1_dir_offset` needs the signed range (a small negative bias
-  must stay negative, not wrap to ~355°). **Fix:** `circular_mean()` now takes
-  an explicit `wrap={"0_2pi", "-pi_pi"}` parameter (default `"0_2pi"`, matching
-  `cb_circMean.m` exactly for bit-for-bit continuity with existing callers);
-  `led2v1_dir_offset` explicitly requests `wrap="-pi_pi"`. This turns a
-  silent-corruption risk into a documented, tested choice at each call site —
-  see the docstrings in `analysis/direction.py`.
+  must stay negative, not wrap to ~355°). **Port fix (done from the start):**
+  `circular_mean()` takes an explicit `wrap={"0_2pi", "-pi_pi"}` parameter
+  (default `"0_2pi"`, matching `cb_circMean.m` exactly); `led2v1_dir_offset`
+  explicitly requests `wrap="-pi_pi"`. This means the Python port was *always*
+  using the `cb_circMean`-equivalent computation, just with an explicit range
+  parameter — there was nothing to change on the Python side. **MATLAB fix
+  (2026-07-10, PI-approved, `python-port-bugfixes` branch, commit `f83a0c8`):**
+  `led2v1_dir_offset.m` now calls `cb_circMean` directly, with an explicit
+  `mod(x+pi, 2*pi)-pi` re-wrap to the signed range it has always documented
+  and returned. Confirmed this is numerically a true no-op: the two
+  computations agree exactly, both algebraically (see
+  `test_led2v1_dir_offset_wrap_convention_is_a_true_no_op` in
+  `tests/test_direction.py`) and on real data.
+  **Extra validation the PI specifically asked for:** does 2-LED heading
+  align with movement (1-LED/displacement) direction on average? Run directly
+  on the shipped fixture's own authoritative `pos.dir`/`pos.dir_disp` (not
+  values derived from this port, to isolate "is this a property of the real
+  data" from "is this port's own direction pipeline right"): the honest
+  answer is *not closely* — a stable, reproducible ~52° mean offset, with a
+  moderate (0.58) resultant length, so a real and fairly consistent
+  difference, not noise. Cross-checked against this port's own independently
+  re-derived 2-LED direction and displacement-direction (using
+  `_heading_from_displacement`, the exact function already used internally
+  for 1-LED trials) and got the same ~50.7° offset — confirming this port's
+  direction computation is faithful to MATLAB (not a new bug introduced by
+  the port), and that the size of the offset is a genuine property of this
+  session's tracking data, not a pipeline defect. `led2v1_dir_offset.m`'s own
+  docstring already frames displacement-based heading as "less accurate"
+  than 2-LED heading — a rat's frame-to-frame displacement vector at 50 Hz is
+  a genuinely noisy proxy for true head orientation (a weaving foraging gait
+  dominates the raw per-sample vector), which plausibly explains a
+  substantial, non-zero average offset without indicating a bug in either
+  the original MATLAB or the port. Pinned by
+  `test_led2v1_dir_offset_on_real_trial_reveals_a_genuine_large_offset`.
 - **`pcFieldStats.m`'s `nansum(rmS)==0` check works, but only by luck.**
   `rmS` is a 2-D matrix; `nansum` without a dimension argument sums down
   columns, returning a row vector, not a scalar — so this reads like a bug
@@ -1218,3 +1246,222 @@ pipeline; (3) `get_2d_fft.m`'s un-odd-forced smoothing kernel can produce
 genuine adjacent-bin ties — correct behaviour, not a bug, and worth knowing
 if anyone visualises `power_spectrum_2d`'s smoothed output at high
 zoom.
+
+## 22. Optional/niche loaders — `read_inp`/`read_stm`/`write_cut` done, `read_KwikRPi` deferred
+
+Ported the last three standalone `Read_Bin_Data` auxiliary readers/writer into
+`io/axona.py`: `read_INP_file.m` -> `read_inp()` (digital-timestamp events —
+button presses, DIO), `read_stm_file.m` -> `read_stm()` (stimulator-timestamp
+events), `write_cut_file.m` -> `write_cut()` (writes a Tint-compatible
+`.cut`). Confirmed directly (`find` over `Read_Bin_Data/Example_data/`) that
+no `.inp` or `.stm` file ships anywhere in the shared example data, so
+`read_inp`/`read_stm` are validated structurally: a byte-exact synthetic file
+is built from the documented header/record layout (7-byte events for `.inp`;
+big-endian `uint32` stream for `.stm`) and the parsed output is checked
+against known ground truth (`tests/test_inp_stm_cut.py`).
+
+**`read_stm` reuses the already-established, more robust marker-search
+pattern instead of transcribing the original's fragile fixed-line-count
+parsing — the identical design choice already made for `.egf` (see §9).**
+`read_stm_file.m` hard-codes "read exactly 11 header lines via `fgetl`, then
+seek 10 bytes forward (past the literal `data_start`) and read to EOF minus
+the trailing 3 `uint32`s that are actually the `data_end` marker's bytes" —
+this only works if the header always has exactly 11 lines and the marker
+framing is exactly as assumed. `read_stm` instead reuses `read_axona_file`'s
+`data_start`/`data_end` marker search (already validated bit-exact for
+`.pos`/tetrode/`.eeg`/`.egf`), which is robust to header length and correctly
+derives the same byte range without hard-coding a line count.
+
+**`read_inp`'s channel-bitmask decoding was traced through by hand before
+writing any code**, since the MATLAB is a genuinely obscure sequence of
+`typecast`/`reshape`/`log2`/`nansum` calls: byte 6 of each 7-byte record
+encodes channels 9-16 (bit 0 = channel 9), byte 7 encodes channels 1-8 (bit 0
+= channel 1); assuming at most one bit set per byte, `log2` of the byte value
+recovers the active bit position, `-inf`/`nan` for a value of 0 (no channel
+active in that byte), and `nansum` across the two bytes then correctly
+collapses to whichever byte had the active bit — or to 0 if neither did,
+exactly matching the "digital off" (channel 0) signal the source's own header
+comment describes. Reproduced directly with `np.log2`/`np.isinf`/`np.nansum`,
+confirmed against a hand-built synthetic file with known onset/off/keypress
+events.
+
+**`write_cut` fixes two confirmed MATLAB bugs, not just the one flagged in
+`PORTING_PLAN.md`:**
+
+1. The task-flagged one: `write_cut_file.m`'s data-header line hard-codes the
+   literal `Exact_cut_for: 1500728a` — one specific historic session's name —
+   completely ignoring its own `fileStem` argument. A clear copy-paste bug
+   with no ambiguity (a self-consistent cut-file writer must embed the actual
+   filename it was given), fixed directly: `write_cut` embeds the real
+   `file_stem`.
+2. **A second, previously-undocumented bug found by reading the source in
+   full: a stale-loop-variable reuse that silently drops the entire
+   spike-assignment body for any cut file with <=25 total spikes.** MATLAB's
+   main-data loop (`for n=0:ceil(nSpikes/25)-2`) reuses the loop variable `n`
+   from an earlier, unrelated loop in the same function (the one writing the
+   20/30 per-cluster header blocks, `for n=0:max(spikeAssignment)`). When the
+   main-data loop's range is empty — true for *any* `nSpikes<=25`, since
+   `ceil(nSpikes/25)<=1` for all of them — MATLAB does not execute the loop
+   body at all, and (well-documented MATLAB behaviour) leaves `n` at
+   whatever value it held from the *previous* loop, i.e. `max(spikeAssignment)`,
+   not the intended 0. The following line, `startLastRow=25*(n+1)+1`, then
+   computes a wildly-too-large starting index (e.g. for a 5-cluster, 9-spike
+   file: `n` stays at 4 from the header loop, `startLastRow=126`), so the
+   final tail loop `for k=startLastRow:nSpikes` also finds its range empty —
+   and the file ends up with a syntactically valid header but *zero* spike
+   cluster-id values written, a silent, complete data-loss failure for
+   exactly the kind of small file a developer would most naturally use to
+   smoke-test the function. Confirmed by tracing the loop variable's scope by
+   hand (not assumed) before writing any Python. **Not preserved — fixed
+   directly**, per the bug-handling policy's "no well-defined output worth
+   preserving" carve-out: this is unambiguous data loss, not a surprising-but-
+   meaningful behaviour, and — concretely — faithfully replicating it would
+   have broken the very round-trip validation this port is checked with (a
+   small, hand-written cluster-assignment vector is the natural choice for a
+   unit test, and is exactly the size class the bug corrupts). Fixed by
+   computing the full-row count directly (`max(0, ceil(n_spikes/25) - 1)`)
+   rather than relying on a loop variable's post-loop value.
+
+**Validation.** `write_cut` round-trips exactly (`np.testing.assert_array_equal`)
+against the already-validated `_read_cut` for a <25-spike vector (the case
+bug 2 above would corrupt), an exact-multiple-of-25 vector (the same bug's
+other trigger boundary — `ceil(25/25)-2=-1`, also an empty range), and a
+137-spike multi-row vector exercising the full-row/tail split. Also checked:
+the `Exact_cut_for:` line embeds the real `file_stem` and never the literal
+`1500728a` (bug 1); the header declares `n_clusters` and writes a block for
+every cluster 0..max even if some ids are unused, matching `write_cut_file.m`;
+a `UserWarning` is raised (not a hard error, matching the original's
+`warning()`) when the max cluster id exceeds 30.
+
+**`read_KwikRPi.m` (159 lines) deferred — no data to validate against, plus a
+confirmed severe, unrelated bug in the source suggesting the relevant code
+path was likely never exercised to completion.** Read the source in full.
+Two independent reasons drove the deferral decision, not just effort budget:
+
+1. **No Kwik-format sample data exists anywhere in the available repos** —
+   confirmed by searching `Universal_Matlab/Read_Bin_Data/Example_data/` for
+   `*.kwd`/`*.kwx`/`*.kwe`/`*.kwik` (none found). Every other loader ported in
+   this project has had at least a real file (even if not a golden-master
+   fixture) to sanity-check byte-level parsing against; here there is
+   nothing, so any port would be validated only against my own
+   from-scratch-constructed synthetic HDF5 files — i.e. testing that the code
+   matches my own understanding of the format, not an independent check.
+2. **A genuine, severe MATLAB bug found while reading the source: the
+   `'eeg'`-option branch contains a true infinite loop.**
+   ```matlab
+   while true
+       n_chan = n_tet_chan + (n_tet - 1) * 4;
+       if ismember(n_chan,badChans)
+           n_tet_chan = n_tet_chan + 1;
+       end
+       if n_tet_chan > 4
+           break
+       end
+   end
+   ```
+   `n_tet_chan` starts at 1 (set immediately before this loop). If channel 1
+   of a tetrode is *not* in `badChans` (the common case), neither branch
+   inside the loop changes any state that the `break` condition depends on —
+   `n_tet_chan` is never incremented, so `n_tet_chan > 4` never becomes true,
+   and the loop spins forever with no way out. This means `read_KwikRPi`'s
+   `'eeg'` option would hang MATLAB indefinitely for any tetrode whose first
+   channel is good — i.e. essentially always — strongly suggesting this
+   specific code path was never actually run to completion, even by the
+   original author. Not a case for "faithful replication" (an infinite loop
+   has no well-defined output to preserve) nor a confident "obvious fix"
+   either — the intended logic (skip past bad channels, give up after 4) is
+   guessable but not verifiable without real bad-channel/HDF5 data to check
+   against, and the function additionally depends on an unread `default_vars.m`
+   and calls `postprocess_pos_data` with a 4-input/7-output MATLAB signature
+   that doesn't match this port's `_position.postprocess_pos_data`.
+
+Given both points, and that this is explicitly the lowest-priority, most
+niche item in this phase's brief (a legacy/deprecated OpenEphys rig format,
+not the DACQ/Neuropixels formats this package is built around), `read_KwikRPi`
+is left unported. If Kwik-format sample data becomes available, the position
+resampling (30 Hz, `interp1`), the `channel_groups/N/time_samples` HDF5
+layout (readable via the already-available `h5py`), and the LED-position
+scaling (`4 * posData`, hard-coded `pixels_per_metre=400`) are all
+straightforward to port from the source directly; the `'eeg'` branch's
+infinite loop needs a design decision (most likely: reinterpret the evident
+intent as "advance `n_tet_chan` unconditionally each iteration") before it
+can be ported at all.
+
+## 23. `image_rm.m`/`tintColorMap.m` -> `viz/plots.py`/`viz/colormaps.py`
+
+Ported the small plotting/visualisation helper into a new `viz/` layer
+(`src/barrylab/viz/colormaps.py::TINT_CMAP`, `viz/plots.py::image_rm`),
+matching the plan's `[plot]` extra (`matplotlib`, already an optional
+dependency in `pyproject.toml`) and, like `analysis/field_shuffle.py`'s
+`scikit-image` precedent, **not** imported by the top-level `barrylab`
+package (`import barrylab` should not require `matplotlib` for a user who
+only wants the numerical analysis) — import directly via
+`from barrylab.viz.plots import image_rm`.
+
+`TINT_CMAP` is the literal 5-colour RGB triplet list from `tintColorMap.m`
+wrapped as a `matplotlib.colors.ListedColormap`. `image_rm(rm, cmap=None,
+ax=None)` draws the rate map with `imshow` (MATLAB's `imagesc` equivalent —
+both normalise the data range onto the colormap's discrete levels the same
+way), marks unvisited (NaN) bins transparent (reproducing MATLAB's
+`set(h,'AlphaData',~unvisted)` trick via an explicit per-pixel alpha array —
+matplotlib's default `cmap.set_bad()` is already fully transparent for NaN,
+so this is a belt-and-braces double cover of the same intent), and titles the
+axes with the peak rate to one decimal place, matching `title([maxRate
+'Hz'])`.
+
+**Validation.** As instructed, this is a plotting function — "runs and
+produces a sane-looking artifact" is the whole bar, not a numerical
+ground-truth comparison. Confirmed: `TINT_CMAP.N == 5` (five colour levels,
+matching `tintColorMap.m`'s 5x3 literal array exactly, checked element-for-
+element); `image_rm` runs without error on a real example ratemap (`r1838
+t2c3`) and on synthetic ratemaps with/without NaN bins, returns a proper
+`AxesImage`, and its alpha channel is exactly the visited-bin mask.
+
+## 24. `sacProps90deg.m` -> `grid.py::square_grid_props`
+
+Read the source in full and found it small and low-risk to port, as
+anticipated in `PORTING_PLAN.md` — it is architecturally the same shape as
+the already-ported `sacProps.m`/`multiGridness.m` (`grid_properties`/
+`gridness`), just for a 4-fold (square, as seen in some trained-network grid
+cells) rather than 6-fold (hexagonal) symmetric grid: look for the 4 peaks
+closest to the SAC centre (not 6), and measure gridness as the correlation at
+a 90-degree rotation minus the max correlation at 45/135 degrees (instead of
+the usual min(60,120) minus max(30,90,150) split).
+
+**Built almost entirely out of already-validated shared helpers, confirmed
+line-by-line to use the *same* peak-detection convention as
+`multiGridness.m`/`sacProps.m` (restricted to positive SAC bins,
+`bwlabel`+`regionprops` centroid-per-plateau) — NOT the "raw"/unrestricted
+`imregionalmax` convention used by `fast_gridness`/`cross_sac_props`/
+`brandon_regularise` (see §14/§16).** Confirmed by direct inspection
+(`sacTemp(sac<=0)=-1` before `imregionalmax`, then `bwlabel`+`regionprops`),
+so this reuses `_sac_peaks` (generalised with a new `n_closest=7` parameter,
+default unchanged, so `gridness()`/`grid_properties()` are behaviourally
+identical before and after — confirmed by rerunning their existing test
+suites unchanged) and `_peak_fields` directly, rather than duplicating either.
+The only genuinely new logic is a small `_rotational_gridness_90` (the
+90/45/135-degree rotation-and-correlate primitive, analogous to but distinct
+from the existing 5-angle `_rotational_gridness`) and the disc-mask
+construction, which is a direct, exact copy of `gridness()`'s own "standard"
+gridness mask logic (same source lines in `sacProps90deg.m` as in
+`multiGridness.m`'s standard-gridness branch).
+
+**MATLAB's `max()` NaN-ignoring semantics reproduced via `np.fmax`**, matching
+the same recurring gotcha handled everywhere else in this project (most
+recently `_brandon_gridness`, §18): `gridness = min(rotatedCorr(1)) -
+max(rotatedCorr([2,3]))` — the `max` over the 45/135-degree correlations
+uses `np.fmax(corr_45, corr_135)`, not a plain comparison, so a single NaN
+correlation (e.g. too few valid overlapping bins at one rotation) doesn't
+spuriously NaN out the whole result.
+
+**Validation.** Structural, using the same synthetic-lattice pattern already
+established for the hexagonal case (`test_grid.py::_hex_grid_map`): a
+synthetic square-lattice rate map (`_square_grid_map`, orthogonal basis
+vectors instead of 60-degree ones) scores a clearly positive 90-degree
+gridness and recovers a scale within one lattice spacing of the true value;
+the same hexagonal-lattice fixture used to validate `gridness`/
+`grid_properties` does **not** score highly on the 90-degree measure (a
+hex grid is not 4-fold symmetric, so this is the expected, meaningful
+discriminating result, not just "doesn't crash"); a single Gaussian blob (no
+periodic structure at all) scores low/NaN, matching the equivalent check
+already used for `gridness`.

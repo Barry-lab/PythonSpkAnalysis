@@ -226,19 +226,23 @@ def led2v1_dir_offset(led2_dir_deg, led1_dir_deg):
     2-LED heading: ``corrected = mod(two_led_dir - mean_offset, 360)``.
 
     .. note::
-       The original MATLAB calls the toolbox ``circ_mean`` here, **not** the
-       lab's own ``cb_circMean`` (the function this module's
-       :func:`circular_mean` ports) — despite ``cb_circMean.m`` stating it was
-       written specifically "to replace unreliable circ_mean". This looks like
-       an oversight in the original codebase rather than a deliberate choice:
-       the two give the *same* mean angle (both reduce to
-       ``atan2(sum sin, sum cos)``), but ``circ_mean`` returns it in
-       ``(-pi, pi]`` where ``cb_circMean`` returns ``[0, 2*pi)``. Since this
-       function needs a signed offset (a small negative bias must stay
-       negative, not wrap to ~360), we call :func:`circular_mean` with
-       ``wrap="-pi_pi"`` to reproduce ``circ_mean``'s behaviour here — using
-       the default ``wrap="0_2pi"`` would silently corrupt the result. See
-       ``FINDINGS.md``.
+       The original MATLAB used to call the external toolbox ``circ_mean``
+       here rather than the lab's own ``cb_circMean`` (the function this
+       module's :func:`circular_mean` ports) — despite ``cb_circMean.m``
+       stating it was written specifically "to replace unreliable circ_mean".
+       **Fixed upstream** (``led2v1_dir_offset.m`` now calls ``cb_circMean``,
+       with an explicit re-wrap to the signed range it has always returned).
+       The two give the *same* mean angle (both reduce to
+       ``atan2(sum sin, sum cos)``); only the output range differs
+       (``circ_mean``: ``(-pi, pi]``, ``cb_circMean``: ``[0, 2*pi)``), so the
+       fix is numerically a no-op — confirmed both algebraically and against
+       real data (this trial's own ``pos.dir``/``pos.dir_disp`` give the
+       identical offset either way, since it happens to be positive; a
+       synthetic negative-offset case confirms the equivalence holds in
+       general too). This port already always used :func:`circular_mean`
+       (the ``cb_circMean``-equivalent computation) with ``wrap="-pi_pi"`` to
+       get the signed offset this function needs — there was nothing to
+       change here, only in the MATLAB. See ``FINDINGS.md``.
 
     Parameters
     ----------
