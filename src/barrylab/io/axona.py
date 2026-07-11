@@ -283,19 +283,19 @@ def write_cut(spike_assignment, dir_path, file_stem, tetrode_no, max_cluster_war
             stacklevel=2,
         )
 
-    full_path = os.path.join(dir_path, "%s_%d.cut" % (file_stem, tetrode_no))
+    full_path = os.path.join(dir_path, f"{file_stem}_{tetrode_no}.cut")
     with open(full_path, "w", newline="") as fh:
-        fh.write("n_clusters: %d\r\n" % (max_cluster + 1))
+        fh.write(f"n_clusters: {max_cluster + 1}\r\n")
         fh.write("n_channels: 4\r\n")
         fh.write("n_params: 2\r\n")
         fh.write("times_used_in_Vt:   15   12   12   16\r\n")
         for n in range(max_cluster + 1):
-            fh.write(" cluster: %2d centre:    0    0    0    0    0    0    0    0\r\n" % n)
+            fh.write(f" cluster: {n:2d} centre:    0    0    0    0    0    0    0    0\r\n")
             fh.write("                min:    0    0    0    0    0    0    0    0\r\n")
             fh.write("                max:    256  256  256  256  256  256  256  256\r\n")
         fh.write("\r\n")
 
-        fh.write("Exact_cut_for: %s spikes: %6d\r\n" % (file_stem, n_spikes))
+        fh.write(f"Exact_cut_for: {file_stem} spikes: {n_spikes:6d}\r\n")
 
         # Body: rows of 25 space-padded cluster ids, then any remaining tail
         # written with no full row and (matching the original exactly) no
@@ -303,9 +303,9 @@ def write_cut(spike_assignment, dir_path, file_stem, tetrode_no, max_cluster_war
         n_full_rows = max(0, -(-n_spikes // 25) - 1)  # ceil(n_spikes / 25) - 1
         for row in range(n_full_rows):
             chunk = spike_assignment[row * 25 : row * 25 + 25]
-            fh.write("".join("  %d" % v for v in chunk) + "\r\n")
+            fh.write("".join(f"  {v}" for v in chunk) + "\r\n")
         tail = spike_assignment[n_full_rows * 25 :]
-        fh.write("".join("  %d" % v for v in tail))
+        fh.write("".join(f"  {v}" for v in tail))
 
     return full_path
 
@@ -314,7 +314,7 @@ def _tetrodes_in_use(settings):
     """Tetrode numbers (1-16) marked as collected in the set file."""
     used = []
     for t in range(1, 17):
-        mask = key_value(settings, "collectMask_%d" % t, "num", exact=True)
+        mask = key_value(settings, f"collectMask_{t}", "num", exact=True)
         if mask:
             used.append(t)
     return used
@@ -386,7 +386,7 @@ def eeg_convert_to_volts(samples, eeg_channel, settings, kind="eeg"):
         raise ValueError("kind must be 'eeg' or 'egf'")
 
     # eeg_channel is 1-based; the .set file's gain_ch_N keys are 0-based.
-    gain = key_value(settings, "gain_ch_%d" % (eeg_channel - 1), "num", exact=True)
+    gain = key_value(settings, f"gain_ch_{eeg_channel - 1}", "num", exact=True)
     return (conv_factor / gain) * samples
 
 
@@ -394,7 +394,7 @@ def _active_eeg_channels(settings, max_channels=16):
     """EEG channel numbers (1-based) flagged as saved in the ``.set`` file."""
     active = []
     for n in range(1, max_channels + 1):
-        flag = key_value(settings, "saveEEG_ch_%d" % n, "num", exact=True)
+        flag = key_value(settings, f"saveEEG_ch_{n}", "num", exact=True)
         if flag:
             active.append(n)
     return active
@@ -492,7 +492,7 @@ def load_dacq(
 
     # --- tetrodes (+ cut) ----------------------------------------------
     for t in _tetrodes_in_use(settings):
-        tet_path = "%s.%d" % (stem, t)
+        tet_path = f"{stem}.{t}"
         if not os.path.exists(tet_path):
             continue
         spike_times, tet_header = _read_tetrode(tet_path)
@@ -506,7 +506,7 @@ def load_dacq(
             spike_times = spike_times[in_range]
             pos_index = one_based[in_range] - 1
 
-        cut_path = "%s_%d.cut" % (stem, t)
+        cut_path = f"{stem}_{t}.cut"
         clusters = _read_cut(cut_path) if os.path.exists(cut_path) else None
 
         rec.electrodes[t] = Electrode(

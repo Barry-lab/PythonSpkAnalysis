@@ -325,7 +325,7 @@ def to_polar_fft(ps2d, max_rad, th_bin=1.0, r_bin=1.0, sigma=None):
             # hard-error here; Python's negative-index wraparound would
             # instead silently return wrong data -- raise explicitly (new
             # code's own robustness concern, not a MATLAB-fidelity issue).
-            raise ValueError("max_rad (%d) exceeds the array's half-size (%d)" % (max_rad, cent))
+            raise ValueError(f"max_rad ({max_rad}) exceeds the array's half-size ({cent})")
         x = np.arange(-max_rad, max_rad + 1)
         y = np.arange(-max_rad, 1)
     else:

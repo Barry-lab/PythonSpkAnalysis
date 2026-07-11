@@ -37,8 +37,14 @@ from barrylab.analysis.maps import occupancy_map, rate_map, spike_map  # noqa: E
 from barrylab.analysis.spatial import spatial_information  # noqa: E402
 from barrylab.io.axona import _read_pos, load_dacq  # noqa: E402
 
-REPO = "/Users/caswell/Documents/Git/Universal_Matlab"
-EX = os.path.join(REPO, "Read_Bin_Data", "Example_data")
+# Point BARRYLAB_EXAMPLE_DATA at the Universal_Matlab Read_Bin_Data/Example_data
+# directory (same env var tests/conftest.py uses). The fallback is only a
+# convenience default for the original dev machine -- set the env var on any
+# other machine.
+EX = os.environ.get(
+    "BARRYLAB_EXAMPLE_DATA",
+    "/Users/caswell/Documents/Git/Universal_Matlab/Read_Bin_Data/Example_data",
+)
 TRIAL = os.path.join(EX, "r1838_10-12-14", "83812141")
 GOLDEN = os.path.join(EX, "gridCell1838_t2c3_14-12-10.mat")
 
@@ -49,11 +55,12 @@ results = []
 
 def check(name, ok, detail=""):
     results.append(ok)
-    print("  [%s] %-32s %s" % ("PASS" if ok else "FAIL", name, detail))
+    status = "PASS" if ok else "FAIL"
+    print(f"  [{status}] {name:<32} {detail}")
 
 
 def note(name, detail):
-    print("  [note] %-32s %s" % (name, detail))
+    print(f"  [note] {name:<32} {detail}")
 
 
 def nanmaxabs(a, b):
@@ -98,7 +105,7 @@ def main():
     check(
         "spike total == n spikes",
         spk.sum() == elec.spike_pos_index(CLUSTER).size,
-        "%d spikes" % int(spk.sum()),
+        f"{int(spk.sum())} spikes",
     )
     check("binning == brute force", _binning_matches_brute(rec, occ, spk, elec))
 
@@ -124,7 +131,7 @@ def main():
 
     print("\n" + "=" * 60)
     n = sum(results)
-    print("RESULT: %d/%d checks passed" % (n, len(results)))
+    print(f"RESULT: {n}/{len(results)} checks passed")
     return 0 if all(results) else 1
 
 

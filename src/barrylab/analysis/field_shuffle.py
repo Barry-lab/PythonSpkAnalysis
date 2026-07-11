@@ -262,8 +262,8 @@ def shuffle_fields(rate_map_shape, field_bin_loc, static_bin, rng=None):
         # which would otherwise surface later as a confusing IndexError once
         # the truncated fld_cent_ind ran out mid-loop.
         raise ValueError(
-            "shuffle_fields has more genuine fields (%d) than movable bins "
-            "(%d) to give them new centres" % (n_field, n_bin)
+            f"shuffle_fields has more genuine fields ({n_field}) than movable "
+            f"bins ({n_bin}) to give them new centres"
         )
 
     # Random field-processing order -- persists through every subsequent

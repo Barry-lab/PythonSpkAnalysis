@@ -57,6 +57,12 @@ target-version = "py39"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
+# UP006/UP007/UP035 would rewrite typing.List/Tuple/Optional annotations to the
+# PEP 585/604 builtin-generic forms (list[...], X | None). Those only *execute*
+# on Python 3.9+, but this package is deliberately kept runnable on Python 3.6
+# too (the lab's dev machine), where `Header = list[tuple[str, str]]` raises at
+# import. Ignored so ruff doesn't reintroduce that breakage. See CONTRIBUTING.md.
+ignore = ["UP006", "UP007", "UP035"]
 
 [tool.mypy]
 python_version = "3.9"

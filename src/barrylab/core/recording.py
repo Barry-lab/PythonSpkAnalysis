@@ -65,10 +65,9 @@ class Electrode:
 
     def __repr__(self):
         n_clusters = len(self.cluster_ids())
-        return "Electrode(id=%r, n_spikes=%d, n_clusters=%d)" % (
-            self.identifier,
-            self.spike_times.size,
-            n_clusters,
+        return (
+            f"Electrode(id={self.identifier!r}, n_spikes={self.spike_times.size}, "
+            f"n_clusters={n_clusters})"
         )
 
 
@@ -149,8 +148,7 @@ class Recording:
         return self.electrodes[identifier]
 
     def __repr__(self):
-        return "Recording(name=%r, n_pos=%d, electrodes=%s)" % (
-            self.name,
-            self.n_pos,
-            sorted(self.electrodes),
+        return (
+            f"Recording(name={self.name!r}, n_pos={self.n_pos}, "
+            f"electrodes={sorted(self.electrodes)})"
         )

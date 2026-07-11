@@ -59,7 +59,8 @@ def pxd(spikes, times, max_iter=PXD_MAX_ITER, accuracy=PXD_ACCURACY, tol=PXD_TOL
     Parameters
     ----------
     spikes : ndarray (n_dir_bins, n_y_bins, n_x_bins)
-        Spike counts per (direction, position) bin, e.g. from :func:`~barrylab.analysis._binning.histnd`.
+        Spike counts per (direction, position) bin, e.g. from
+        :func:`~barrylab.analysis._binning.histnd`.
     times : ndarray, same shape as ``spikes``
         Dwell time in **seconds** per bin.
     max_iter, accuracy, tol : see :mod:`barrylab.params` (``PXD_*``).

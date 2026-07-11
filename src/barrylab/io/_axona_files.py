@@ -10,7 +10,7 @@ Ported from the MATLAB ``read_binary_data.m``, ``find_word.m`` and
 it is easy to audit against the originals.
 """
 
-from typing import Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -18,8 +18,11 @@ _DATA_START = b"data_start"
 _DATA_END = b"data_end"
 
 # A parsed header: an ordered list of (key, value) string pairs, mirroring the
-# 2-column cell array the MATLAB toolbox passes around.
-Header = list[tuple[str, str]]
+# 2-column cell array the MATLAB toolbox passes around. Uses typing.List/Tuple
+# (not the PEP 585 builtin generics list[...]/tuple[...]) deliberately, so this
+# executes on Python 3.6 too -- see the ruff UP006/UP007 ignore in
+# pyproject.toml and the 3.6 note in CONTRIBUTING.md.
+Header = List[Tuple[str, str]]
 
 
 def _parse_header_text(text: str) -> Header:
@@ -39,7 +42,7 @@ def _parse_header_text(text: str) -> Header:
     return header
 
 
-def read_axona_file(path: str, has_binary: bool) -> tuple[Header, Optional[bytes]]:
+def read_axona_file(path: str, has_binary: bool) -> Tuple[Header, Optional[bytes]]:
     """Read an Axona file, returning its header and (optional) binary payload.
 
     Parameters

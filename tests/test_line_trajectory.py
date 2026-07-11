@@ -39,7 +39,7 @@ def test_best_line_roundtrips_via_reget_and_residual(pmat_data):
         n_checked += 1
         ln_bnd = reget_line_band(pmat.shape, best_spd[0], best_y_interc, 14)
         res_test = line_residual(pmat, ln_bnd)
-        assert abs(best_res - res_test) < 1e-9, "event %d: %r vs %r" % (i, best_res, res_test)
+        assert abs(best_res - res_test) < 1e-9, f"event {i}: {best_res!r} vs {res_test!r}"
 
     assert n_checked > 50  # sanity: most events should yield a fit
 

@@ -97,7 +97,7 @@ def cross_sac_props(xsac):
         # (<3, 2) axis_ang_dist.
         raise ValueError(
             "cross_sac_props needs at least 7 detected peaks (1 central + "
-            "6 neighbours), found %d" % peak_m.size
+            f"6 neighbours), found {peak_m.size}"
         )
 
     n_rows, n_cols = xsac.shape

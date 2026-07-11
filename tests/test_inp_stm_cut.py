@@ -19,7 +19,7 @@ from barrylab.io.axona import _read_cut, read_inp, read_stm, write_cut
 
 def _write_synthetic_axona_file(path, header_lines, binary):
     """Build a minimal Axona-style file: text header + data_start + binary + data_end."""
-    header_text = "".join(l + "\r\n" for l in header_lines)
+    header_text = "".join(line + "\r\n" for line in header_lines)
     with open(path, "wb") as fh:
         fh.write(header_text.encode("ascii"))
         fh.write(b"data_start")
@@ -51,7 +51,7 @@ def test_read_inp_parses_digital_onset_and_offset(tmp_path):
         "trial_date Wednesday, 15 Jan 2020",
         "trial_time 12:00:00",
         "num_INP_samples 4",
-        "timebase %d hz" % timebase,
+        f"timebase {timebase} hz",
         "bytes_per_timestamp 4",
         "bytes_per_type 1",
         "bytes_per_channel 2",
@@ -97,10 +97,10 @@ def test_read_stm_parses_uint32_timestamps(tmp_path):
         "set_file_name test",
         "experimenter CB",
         "comments none",
-        "timebase %d hz" % timebase,
+        f"timebase {timebase} hz",
         "duration 100",
         "spike_format none",
-        "num_stm_samples %d" % len(values),
+        f"num_stm_samples {len(values)}",
     ]
     path = os.path.join(str(tmp_path), "test.stm")
     _write_synthetic_axona_file(path, header, binary)

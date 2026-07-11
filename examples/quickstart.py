@@ -56,7 +56,7 @@ def _try_plot(rec, elec, cluster, rmap):
     fig, ax = plt.subplots(1, 2, figsize=(10, 4.6))
     ax[0].plot(rec.xy[:, 0], rec.xy[:, 1], color="0.7", lw=0.4)
     ax[0].scatter(rec.xy[spk_idx, 0], rec.xy[spk_idx, 1], s=6, color="crimson")
-    ax[0].set_title("trajectory + spikes (t%d c%d)" % (elec.identifier, cluster))
+    ax[0].set_title(f"trajectory + spikes (t{elec.identifier} c{cluster})")
     ax[0].set_aspect("equal")
     ax[0].invert_yaxis()
 
@@ -67,7 +67,7 @@ def _try_plot(rec, elec, cluster, rmap):
         a.set_xticks([])
         a.set_yticks([])
     fig.tight_layout()
-    out = os.path.join(out_dir, "ratemap_t%dc%d.png" % (elec.identifier, cluster))
+    out = os.path.join(out_dir, f"ratemap_t{elec.identifier}c{cluster}.png")
     fig.savefig(out, dpi=130)
     print(f"  saved {out}")
 
