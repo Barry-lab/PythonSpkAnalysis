@@ -40,26 +40,19 @@ def cross_sac_props(xsac):
     neighbours) -- exactly as intolerant of fewer as the original MATLAB,
     which indexes ``dist(2:7)`` unconditionally.
 
-    .. warning::
-       Confirmed via a hand-constructed, unambiguous synthetic xSAC that the
-       core geometry here (angle/distance/peak-selection) is an exact
-       translation of ``xSacProps.m``. But the MATLAB algorithm itself has a
-       fragility worth knowing about, faithfully preserved rather than
-       fixed (see ``FINDINGS.md``): it zero-clips every negative correlation
-       bin *before* peak detection (``xsac(xsac<0)=0``), and
-       ``imregionalmax`` treats a large flat region as trivially "locally
-       maximal" everywhere within it. On a realistic correlogram -- where
-       roughly half the bins are typically negative, away from genuine
-       structure -- this floods the candidate-peak list with thousands of
-       spuriously-tied, zero-valued "peaks". Because every returned field
-       here is chosen by proximity (closest peak to the centre, then
-       closest six peaks to *that* peak), a real correlogram's true
-       hexagonal structure can be swamped by nearer, meaningless
-       zero-plateau points -- ``peak_corr`` coming back as exactly ``0.0``
-       is the tell. Check ``peak_corr`` before trusting ``phase_mag``/
-       ``phase_ang``/``peak_coord``, and treat ``axis_ang_dist`` (which
-       searches for neighbours even closer in than the already-fragile
-       central peak) with real caution on non-idealised input.
+    .. note::
+       The original ``xSacProps.m`` had a fragility (now fixed both upstream
+       and here, see ``FINDINGS.md``): it zero-clipped every negative
+       correlation bin to 0 *before* peak detection, and ``imregionalmax``
+       treats a large flat region as trivially "locally maximal" everywhere
+       within it. On a realistic correlogram -- where roughly half the bins
+       are negative, away from genuine structure -- that flooded the
+       candidate-peak list with thousands of spuriously-tied zero-valued
+       "peaks" that swamped the real hexagonal structure in every
+       proximity search (``peak_corr`` came back as exactly ``0.0``). The fix
+       (Universal_Matlab python-port-bugfixes commit a443363, propagated
+       here) finds peaks on the raw xSAC and keeps only the positive ones, so
+       the true phase offset is recovered on realistic input.
 
     Parameters
     ----------
@@ -85,11 +78,17 @@ def cross_sac_props(xsac):
             three smallest-angle of the six peaks surrounding the central
             peak (candidate grid axis directions).
     """
+    # Find peaks on the raw (only NaN-substituted) xSAC and keep the positive
+    # ones -- matching the upstream xSacProps.m fix (Universal_Matlab
+    # python-port-bugfixes commit a443363). The old code zero-clipped every
+    # negative bin to 0 *before* peak detection, which made one huge flat
+    # region that imregionalmax treated as locally maximal everywhere,
+    # flooding the candidate list with meaningless tied zero-valued "peaks"
+    # that swamped the real hexagonal structure in every proximity search.
     xsac = np.real(np.asarray(xsac, dtype=float))
     xsac = np.where(np.isnan(xsac), -1.0, xsac)
-    xsac = np.where(xsac < 0, 0.0, xsac)
 
-    peak_m, peak_n = _raw_regional_max_peaks(xsac)  # 0-based
+    peak_m, peak_n = _raw_regional_max_peaks(xsac, positive_only=True)  # 0-based
     if peak_m.size < 7:
         # MATLAB indexes dist(2:7) unconditionally and would error out here
         # too (an out-of-bounds index) -- raise explicitly rather than let

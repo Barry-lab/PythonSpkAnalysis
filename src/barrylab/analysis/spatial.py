@@ -67,8 +67,12 @@ def adaptive_binning(dwell_times, spikes, alpha=ADAPTIVE_SMOOTH_ALPHA):
     spikes = np.asarray(spikes, dtype=float)
 
     if spikes.sum() == 0:
-        empty = np.where(dwell_times == 0, np.nan, dwell_times)
-        return (np.where(dwell_times == 0, np.nan, spikes), empty, empty)
+        # No spikes: rate and smooth_spk are 0 in visited bins (NaN unvisited),
+        # smooth_pos is the dwell map. Returns (rate, smooth_spk, smooth_pos) --
+        # the 2nd element must be the spike map (all-zero), not the dwell map.
+        spk_map = np.where(dwell_times == 0, np.nan, spikes)  # 0 (visited) / NaN
+        pos_map = np.where(dwell_times == 0, np.nan, dwell_times)
+        return spk_map, spk_map, pos_map
 
     smooth_pos = np.zeros_like(dwell_times)
     smooth_spk = np.zeros_like(dwell_times)
@@ -146,10 +150,16 @@ def true_ppm_bounding_box(occupancy_bins, bin_size_px, env_size_m):
     (ppm, i_range, j_range)
         ``ppm`` is the inferred pixels-per-metre. ``i_range``/``j_range`` are
         0-based Python ``range`` objects over the occupied region's rows/cols
-        (for cropping). **Note:** these faithfully reproduce an off-by-one in
-        the original MATLAB that excludes the region's last row and column —
-        see ``FINDINGS.md``. Returns ``(nan, range(0,0), range(0,0))`` if no
-        bin was ever visited.
+        (for cropping), spanning the full occupied bounding box. Returns
+        ``(nan, range(0,0), range(0,0))`` if no bin was ever visited.
+
+    .. note::
+       The original ``get_true_PPM_boundingBox.m`` had an off-by-one that
+       excluded the region's last row and column from the returned crop
+       ranges (an extra ``-1`` on top of the already-adjusted bounding-box
+       width). Fixed both upstream and here (Universal_Matlab
+       python-port-bugfixes commit f7b6332); the ``ppm`` value itself was
+       never affected (it comes from the filled *area*, not these ranges).
     """
     visited = np.asarray(occupancy_bins) > 0
     labelled, n = label(visited)  # scipy default = 4-connectivity in 2D
@@ -169,7 +179,7 @@ def true_ppm_bounding_box(occupancy_bins, bin_size_px, env_size_m):
     r0, r1, c0, c1 = bboxes[best]
 
     ppm = float(np.sqrt(filled_area) * bin_size_px / env_size_m)
-    # MATLAB: iRange = ijCorner(1):ijCorner(1)+ijWidth(1)-1, which (after
-    # translating the 1-based BoundingBox arithmetic) excludes the region's
-    # final row/col. Reproduced here rather than "fixed" — see FINDINGS.md.
-    return ppm, range(r0, r1), range(c0, c1)
+    # Full occupied bounding box, inclusive of the last row/col (r1, c1) --
+    # the +1 makes the Python range span [r0, r1]/[c0, c1]. See the off-by-one
+    # note in the docstring (fixed upstream, commit f7b6332).
+    return ppm, range(r0, r1 + 1), range(c0, c1 + 1)

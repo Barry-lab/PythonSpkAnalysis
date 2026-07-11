@@ -253,7 +253,12 @@ def gridness(sac):
     standard = _rotational_gridness(filled, standard_mask)
 
     # Expanding: max gridness over annuli from inner+2 out to the SAC edge.
-    inner = int(round(np.mean(np.sqrt((peaks["xy_central"] ** 2).sum(axis=0))) / 2.0))
+    # Inner radius = half the mean distance to the central peaks. sum(axis=1)
+    # is per-peak (each row is one peak's [x, y] offset) -- axis=0 would sum
+    # down columns (all peaks' x^2 then all y^2), which was the multiGridness.m
+    # bug fixed upstream (Universal_Matlab python-port-bugfixes commit bc4feb9).
+    # MATLAB round() is half-away-from-zero; the value is >= 0 so floor(x+0.5).
+    inner = int(np.floor(np.mean(np.sqrt((peaks["xy_central"] ** 2).sum(axis=1))) / 2.0 + 0.5))
     best = -np.inf
     for outer_r in range(inner + 2, max_allow + 1):
         annulus = (centre_radi <= outer_r) & (centre_radi >= inner)
@@ -480,22 +485,29 @@ def _regional_minima_1d(x):
     return is_min
 
 
-def _raw_regional_max_peaks(filled):
+def _raw_regional_max_peaks(filled, positive_only=False):
     """0-based ``(row, col)`` of every ``imregionalmax`` peak pixel.
 
-    NOT restricted to positive values (unlike the ``_sac_peaks`` helper
-    behind :func:`gridness`/:func:`grid_properties`, which follows
-    ``multiGridness.m``'s convention of masking non-positive bins to -1
-    before peak detection). Shared by :func:`fast_gridness`,
+    Shared by :func:`fast_gridness`,
     :func:`~barrylab.analysis.grid_phase.cross_sac_props` and
-    :func:`~barrylab.analysis.grid_ellipse.brandon_regularise`, whose MATLAB
-    sources (``fs_fastGridness.m``, ``xSacProps.m``, ``brandonRegEcc.m``) all
-    use this exact unrestricted-``imregionalmax``-then-``find()`` pattern.
-    Peaks are returned in MATLAB's column-major ``find()`` order, since that
-    order matters for tie-breaking wherever a caller later truncates to the
-    N closest peaks.
+    :func:`~barrylab.analysis.grid_ellipse.brandon_regularise`. Peaks are
+    returned in MATLAB's column-major ``find()`` order, since that order
+    matters for tie-breaking wherever a caller later truncates to the N
+    closest peaks.
+
+    ``positive_only`` restricts peaks to strictly-positive bins (the
+    convention ``_sac_peaks`` uses for :func:`gridness`/:func:`grid_properties`
+    via ``multiGridness.m``). ``fs_fastGridness.m`` and ``xSacProps.m`` were
+    both fixed upstream to do this (Universal_Matlab python-port-bugfixes
+    commits 7c256ae and a443363) -- without it, a large flat region of
+    negative/NaN-substituted bins is treated as locally maximal everywhere,
+    flooding the candidate list with spurious tied "peaks". ``brandonRegEcc.m``
+    was not changed upstream, so :func:`brandon_regularise` keeps the raw
+    (``positive_only=False``) behaviour.
     """
     is_max = filled == maximum_filter(filled, size=3, mode="nearest")
+    if positive_only:
+        is_max = is_max & (filled > 0)
     flat_idx = np.flatnonzero(is_max.ravel(order="F"))
     return np.unravel_index(flat_idx, is_max.shape, order="F")
 
@@ -551,7 +563,7 @@ def fast_gridness(sac):
     filled = np.where(np.isnan(sac), -1.0, sac)
     n_rows, n_cols = filled.shape
 
-    ys, xs = _raw_regional_max_peaks(filled)
+    ys, xs = _raw_regional_max_peaks(filled, positive_only=True)
     if ys.size < 2:
         return float("nan"), float("nan"), float("nan")
 

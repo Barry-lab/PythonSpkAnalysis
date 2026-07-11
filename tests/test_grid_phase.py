@@ -94,18 +94,19 @@ def test_cross_sac_props_self_correlation_has_zero_phase_offset():
     assert np.isclose(props["peak_corr"], 1.0)
 
 
-def test_cross_sac_props_swamped_by_zero_clipped_background_on_realistic_input():
-    """Documents a genuine MATLAB fragility (xSacProps.m), faithfully
-    replicated rather than fixed -- see FINDINGS.md and the cross_sac_props
-    docstring. Zero-clipping every negative correlation bin before peak
-    detection floods the candidate list with spuriously-tied zero-valued
-    "peaks" on any realistic (non-self) correlogram, so the phase-offset
-    result generally does NOT recover the true injected spatial offset
-    between two grid modules -- peak_corr coming back as 0.0 is the tell.
-    """
+def test_cross_sac_props_recovers_offset_on_realistic_input():
+    """The upstream xSacProps.m fix (Universal_Matlab python-port-bugfixes
+    commit a443363, propagated here): find peaks on the raw xSAC and keep the
+    positive ones, rather than zero-clipping every negative bin *before* peak
+    detection. The old code created one huge flat zero region that
+    imregionalmax treated as locally maximal everywhere, flooding the
+    candidate list with spuriously-tied zero-valued "peaks" that swamped the
+    real hexagonal structure (peak_corr came back as 0.0). With the fix, the
+    true injected spatial offset between two grid modules is recovered."""
     rm = _hex_grid_map()
     rm2 = _hex_grid_map(offset=(1.5, 3.0))
     xsac = cross_correlogram(rm, rm2)
     props = cross_sac_props(xsac)
-    assert props["peak_corr"] == 0.0
-    assert not np.isclose(props["phase_mag"], np.hypot(3.0, 1.5), atol=0.5)
+    assert props["peak_corr"] > 0.5  # a real correlation peak, not a spurious 0.0
+    # recovered within ~1 bin of the true offset (bin discretisation aside)
+    assert np.isclose(props["phase_mag"], np.hypot(3.0, 1.5), atol=1.0)

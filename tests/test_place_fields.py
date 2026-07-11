@@ -145,12 +145,13 @@ def test_spatial_correlation_stack_maps_false_returns_per_cell():
 
 def test_true_ppm_bounding_box_square_region():
     occ = np.zeros((50, 50))
-    occ[10:30, 10:30] = 1.0  # a 20x20 occupied square
+    occ[10:30, 10:30] = 1.0  # a 20x20 occupied square (rows/cols 10..29)
     ppm, i_range, j_range = true_ppm_bounding_box(occ, bin_size_px=5.0, env_size_m=1.0)
     # filled_area = 400 -> sqrt = 20 -> ppm = 20 * 5 / 1 = 100
     assert np.isclose(ppm, 100.0)
-    assert list(i_range) == list(range(10, 29))  # off-by-one preserved (see FINDINGS.md)
-    assert list(j_range) == list(range(10, 29))
+    # full occupied span, inclusive of the last row/col (off-by-one fixed, f7b6332)
+    assert list(i_range) == list(range(10, 30))
+    assert list(j_range) == list(range(10, 30))
 
 
 def test_true_ppm_bounding_box_no_visited_bins():
