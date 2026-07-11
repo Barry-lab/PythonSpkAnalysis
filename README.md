@@ -266,14 +266,17 @@ synthetic case with known ground truth, an independent textbook/analytic
 oracle, or cross-consistency against an already-validated function (real
 data alone was never treated as sufficient). Any MATLAB bugs or quirks found
 along the way are documented rather than silently fixed, unless replicating
-one would leave the Python function simply broken. Full detail — the exact
-validation used for every function, and every MATLAB bug found — is in
-[`FINDINGS.md`](FINDINGS.md); remaining/deferred pieces are tracked in
-[`PORTING_PLAN.md`](PORTING_PLAN.md).
+one would leave the Python function simply broken. The port has also been
+through a multi-agent correctness audit (which surfaced and fixed several
+real bugs — including in the original MATLAB) and a naming-accuracy review.
+Full detail — the exact validation used for every function, and every MATLAB
+bug found and how it was handled — is in [`FINDINGS.md`](FINDINGS.md).
 
-**No lab member has independently reviewed this port line-by-line yet.** If
-you use it for real analysis, sanity-check results that matter against the
-MATLAB toolbox, and open an issue if anything looks off.
+**It has not yet had a full, independent line-by-line review by a person.**
+The DACQ path is validated bit-exact against MATLAB output; the Neuropixels
+path is experimental (see above). If you use this for real analysis,
+sanity-check results that matter against the MATLAB toolbox, and open an
+issue if anything looks off.
 
 ## License
 

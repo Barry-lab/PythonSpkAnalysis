@@ -12,9 +12,13 @@ so a rate map does not care whether the spikes came from a 2010 Axona tetrode or
 a 2026 Neuropixel. To support a new acquisition system you write a new loader;
 you touch no analysis code.
 
-Today `load_dacq` (Axona/DACQ) is the **only implemented loader**. Everything
-below describes the contract it satisfies, so the next loader can satisfy the
-same one.
+There are two implemented loaders: `load_dacq` (Axona/DACQ, the mature,
+golden-master-validated one) and `load_neuropixels` (experimental). They are
+worth reading side by side — `load_dacq` reads raw binary files, while
+`load_neuropixels` composes *already-sorted* spikes (from SpikeInterface) with a
+separately-supplied position track — because they show the same contract
+satisfied two very different ways. Everything below describes that contract, so
+the next loader can satisfy the same one.
 
 ## The loader contract
 

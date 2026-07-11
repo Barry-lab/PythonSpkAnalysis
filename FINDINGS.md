@@ -203,27 +203,27 @@ predicted spikes matches actual, per marginal).
 
 ## 6. Bayesian decoding, v0.4
 
-Ported `decode_calcPost.m` -> `bayesian_posterior` (naive ML Poisson population
-decoder), `decode_getSpkCnt.m` -> `spike_counts_per_window` (windowed, optionally
+Ported `decode_calcPost.m` -> `decode_calc_post` (naive ML Poisson population
+decoder), `decode_getSpkCnt.m` -> `decode_get_spike_counts` (windowed, optionally
 overlapping/Gaussian-smoothed spike counting), `decode_processPost.m` ->
-`decode_maximum_likelihood` (ML decode + accuracy metrics), and
-`decode_calcBayesPost.m` -> `bayesian_posterior_with_prior` (full Bayesian
+`decode_process_post` (ML decode + accuracy metrics), and
+`decode_calcBayesPost.m` -> `decode_calc_bayes_post` (full Bayesian
 decoder with a spatial occupancy prior and a sequential movement/"closeness"
 prior, Zhang et al. 1998 eq. 36). `decode_crunchData.m` is *not* a port but a
-fresh `crunch_decode()` orchestrator redesigned around `Recording` (train/test
+fresh `decode_crunch_data()` orchestrator redesigned around `Recording` (train/test
 split, build rate maps, decode) — validate the four functions above
 individually, this convenience wrapper is intentionally not bit-exact.
 
 **Two bugs found and fixed in my own new code (not MATLAB-fidelity issues —
-`crunch_decode`/`bayesian_posterior_with_prior` are original code, so these are
+`decode_crunch_data`/`decode_calc_bayes_post` are original code, so these are
 just implementation bugs, fixed directly rather than "faithfully reproduced"):**
-1. `crunch_decode`'s first draft computed occupancy over the *whole* session
+1. `decode_crunch_data`'s first draft computed occupancy over the *whole* session
    while spikes were correctly restricted to the training split, diluting the
    rate-map denominator with test-period dwell time. Fixed by reusing
    `spike_map` (which already bins an arbitrary position-index subset) for a
    train-restricted occupancy count too, instead of the whole-session
    `occupancy_map`.
-2. `bayesian_posterior_with_prior`'s per-step peak-finding used plain
+2. `decode_calc_bayes_post`'s per-step peak-finding used plain
    `np.argmax`, not `np.nanargmax`. NaN in a numpy array is comparison-broken
    (`nan > x` is `False`), so with real (partially-unvisited) rate maps a
    sizeable NaN-contaminated posterior would make `argmax` return the *first*
@@ -241,14 +241,14 @@ already collapses to a single (first) index before that line runs, so the
 resolve to the first maximum in MATLAB's column-major linear order. Reproduced
 faithfully via `order='F'` (not genuine random tie-breaking) per goal 1.
 
-**Validation.** `bayesian_posterior` is bit-exact against a hand-computed
+**Validation.** `decode_calc_post` is bit-exact against a hand-computed
 Poisson PMF (`scipy.stats.poisson.pmf`, matches to 1e-6) and normalises exactly
-to 1. `spike_counts_per_window` matches hand-counted windows (including
+to 1. `decode_get_spike_counts` matches hand-counted windows (including
 overlap) exactly, and Gaussian smoothing preserves total spike mass. The
-decisive check for `decode_maximum_likelihood`/`bayesian_posterior`: decoding
+decisive check for `decode_process_post`/`decode_calc_post`: decoding
 **synthetic data with clean, non-periodic place fields and known ground
 truth** recovers position far better than chance (mean error 2.25 bins vs a
-~9.4-bin chance level on a 20x20 grid). Real r1838 data (via `crunch_decode`)
+~9.4-bin chance level on a 20x20 grid). Real r1838 data (via `decode_crunch_data`)
 decodes only modestly better than a naive chance baseline when using the
 documented grid cells (t2c1/t2c3) — this is very likely genuine
 neuroscience, not a bug: grid cells have multiple periodic firing fields, so
@@ -495,7 +495,7 @@ repo, not a discrepancy between my port and some external reference, this
 is a case for actually updating the port (unlike goal-1's "preserve MATLAB
 bugs faithfully" rule, which is about not silently diverging from the
 authoritative implementation — here the authoritative implementation moved,
-and the old value was never the intended one). `bayesian_posterior`'s
+and the old value was never the intended one). `decode_calc_post`'s
 `_SMALL_V_CALC_POST` updated from `eps**8` to `eps` to match.
 
 **A genuine inconsistency in the current MATLAB itself, left as-is.**
@@ -505,7 +505,7 @@ originally-identical `smallV=eps.^8` line as `decode_calcPost.m` — but the
 near-twin. Checked directly against the current upstream file to confirm
 this isn't an artifact of my own stale clone. Since `decode_calcBayesPost.m`
 genuinely still has the old value in the actively-maintained repo,
-`bayesian_posterior_with_prior`'s `_SMALL_V_BAYES_POST` is kept at `eps**8`
+`decode_calc_bayes_post`'s `_SMALL_V_BAYES_POST` is kept at `eps**8`
 to match its actual current source — the two Python constants are now
 deliberately different, one per MATLAB function, rather than a single shared
 value, because the two MATLAB functions have themselves diverged.
@@ -836,7 +836,7 @@ without error on the real, watershed-segmented r1838 grid cell.
 
 Ported the last of the FieldShuffle orchestration: `field_shuffle_significance`
 (`fs_masterAnalysis.m`) and `is_grid_cell` (`identify_grid_cell.m`), both
-redesigned around `Recording` like `crunch_decode` (validate the component
+redesigned around `Recording` like `decode_crunch_data` (validate the component
 functions individually — `fast_gridness`, `brandon_regularise`,
 `shuffle_fields` — this end-to-end orchestrator is not bit-exact, and
 inherits `shuffle_fields`' genuine per-call randomness on top). Also added
@@ -1079,7 +1079,7 @@ circular-in-angle/non-wrapping-in-radius Gaussian smoothing).
 `main_spatial_fft.m` (v1) confirmed skipped per `PORTING_PLAN.md` — its own
 header says use v2, and it bins via the superseded `bin_pos_data` and starts
 workers via the obsolete `goPar`. `main_spatial_fft2.m` -> `grid_fft_components`,
-a `Recording`-level redesign (like `crunch_decode`/`field_shuffle_significance`
+a `Recording`-level redesign (like `decode_crunch_data`/`field_shuffle_significance`
 — not bit-exact, validate the component transforms instead).
 
 **Confirmed by directly reading both sources: `get_polar_fft.m`'s mean
@@ -1206,7 +1206,7 @@ dict (`ps2d`, `ps_polar`, `theta_deg`, `angular_profile`, etc. are always
 present, since they're computed regardless of significance), with
 `significant=False` and empty `peak_angle_deg`/`peak_wavelength_cm` arrays
 in that case — a natural, minor consequence of choosing a dict return for a
-non-bit-exact orchestrator (matching `crunch_decode`/
+non-bit-exact orchestrator (matching `decode_crunch_data`/
 `field_shuffle_significance`'s own dict-return style), not a MATLAB
 behaviour change.
 

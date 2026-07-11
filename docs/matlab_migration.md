@@ -90,8 +90,8 @@ porting or comparing against a MATLAB function that instead calls the toolbox
 `circ_mean` (as `led2v1_dir_offset.m` does — see `FINDINGS.md` §3), that
 function's angles come back in `(-π, π]`, not `[0, 2π)`. The mean angle is
 identical either way; only the range differs. Pass `wrap="-pi_pi"` when you
-need the signed convention. See the full porting plan and dependency notes in
-[`PORTING_PLAN.md`](../PORTING_PLAN.md).
+need the signed convention. See the per-function validation notes and
+dependency gotchas in [`FINDINGS.md`](../FINDINGS.md).
 
 ## How you used to / how you do it now
 

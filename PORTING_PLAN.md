@@ -57,7 +57,7 @@ analysis. Ships the small shared bits everything else reuses.
 Bayesian decoder trio (`decode_calcPost`, `decode_getSpkCnt`, `decode_processPost`),
 `decode_calcBayesPost`, the `lineTraj_*` group (validated via the shipped `pMat_data.mat` oracle —
 round-trip self-consistency across 118/230 real replay events, no MATLAB runtime available to compare
-literal reference numbers, see `FINDINGS.md` §13), the Recording-level `crunch_decode` orchestrator,
+literal reference numbers, see `FINDINGS.md` §13), the Recording-level `decode_crunch_data` orchestrator,
 and `circ_regress_cb` (phase-precession circular–linear regression — infra-free, built-in Fisher B.20
 oracle). No infra; grouped because it is the biggest concentration of column-major/1-based index risk
 and shares validation discipline.
@@ -92,7 +92,7 @@ and the `deal(zeros(n))` "bug" that traced out numerically harmless.
 **v0.7 — Watershed-gated FieldShuffle. STATUS: DONE.** Segmentation (`watershed_fields`,
 `field_bin_locations`), `fs_shufFields` (`shuffle_fields` — genuine per-call randomness, validated
 structurally only), and the `fs_masterAnalysis`/`identify_grid_cell` orchestration
-(`field_shuffle_significance`/`is_grid_cell`, Recording-level redesigns like `crunch_decode`) are all
+(`field_shuffle_significance`/`is_grid_cell`, Recording-level redesigns like `decode_crunch_data`) are all
 ported. Two more genuine MATLAB bugs found while reading `fs_masterAnalysis.m`/`identify_grid_cell.m`
 (a `rotSpkPos` wraparound variable mix-up, and `identify_grid_cell.m` referencing an undefined
 `data.pos`), plus a real capacity fragility found via real (not just synthetic) non-grid-cell data and
@@ -201,11 +201,11 @@ collapse via `label`+`center_of_mass`; `imrotate` is CCW-positive vs scipy `rota
 ### Decoding
 | function | barrylab target | consumes | needs-infra | oracle | priority |
 |---|---|---|---|---|---|
-| `decode_calcPost` | `analysis/decoding.py::bayesian_posterior` | A | no | GF (bit-exact) | core |
-| `decode_getSpkCnt` | `decoding.py::spike_counts_per_window` | A | no | GF | core |
+| `decode_calcPost` | `analysis/decoding.py::decode_calc_post` | A | no | GF (bit-exact) | core |
+| `decode_getSpkCnt` | `decoding.py::decode_get_spike_counts` | A | no | GF | core |
 | `decode_processPost` | `decoding.py::decode_ml` | A (+bin index) | no | GF (avoid ties) | core |
-| `decode_calcBayesPost` | `decoding.py::bayesian_posterior_with_prior` | A | no | GF (unique maxima) | useful |
-| `decode_crunchData` | `decoding.py::crunch_decode` (rewrite around Recording) | R | no | end-to-end approx | useful |
+| `decode_calcBayesPost` | `decoding.py::decode_calc_bayes_post` | A | no | GF (unique maxima) | useful |
+| `decode_crunchData` | `decoding.py::decode_crunch_data` (rewrite around Recording) | R | no | end-to-end approx | useful |
 | `lineTraj_get_res` | `line_trajectory.py::line_residual` | A | no | MAT roundtrip | **DONE** |
 | `lineTraj_define_line` | `line_trajectory.py::_define_line` | A | no | STRUCT (via decode) | **DONE** |
 | `lineTraj_reget_lnBnd` | `line_trajectory.py::reget_line_band` | A | no | MAT roundtrip | **DONE** |

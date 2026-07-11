@@ -72,15 +72,17 @@ is deliberately a plain class of arrays a student can print and inspect field by
 field. This keeps the core transparent, dependency-light and debuggable by rotating
 students and postdocs, many arriving from MATLAB. NWB is powerful but heavyweight
 and opaque for day-to-day debugging; we reserve it for export and interchange
-(roadmap v0.4+), not as the in-memory representation.
+(a possible future boundary format), not as the in-memory representation.
 
 **Adopt SpikeInterface/Kilosort for Neuropixels loading, but own the spatial
-metrics.** When the Neuropixels front end lands (roadmap v0.3), spike sorting and
-raw I/O come from mature community tools (SpikeInterface, Kilosort4, SpikeGLX and
-Open Ephys) feeding into the *same* `Recording`. But the spatial-coding metrics —
-rate maps, Skaggs information, adaptive binning — are the lab's validated
-intellectual property, ported from `Universal_Matlab` and checked numerically
-against MATLAB output (golden-master validation). We keep and own those.
+metrics.** The (experimental) Neuropixels front end, `load_neuropixels` in
+`io/neuropixels.py`, does exactly this: spike sorting and raw I/O come from
+mature community tools (SpikeInterface, Kilosort, SpikeGLX, Open Ephys), and
+this package just reads the *already-sorted* result plus a behavioural position
+track and fills the *same* `Recording`. The spatial-coding metrics — rate maps,
+Skaggs information, adaptive binning — are the lab's validated intellectual
+property, ported from `Universal_Matlab` and checked numerically against MATLAB
+output (golden-master validation). We keep and own those.
 
 **Analysis functions never touch a file path.** This is enforced by convention and
 visible in the code: `maps.py` and `spatial.py` import no I/O. It is what lets a

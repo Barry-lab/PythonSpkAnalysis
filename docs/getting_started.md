@@ -87,7 +87,7 @@ carries about position. Feed it the rate map and the matching occupancy map:
 ```python
 occ = bl.occupancy_map(rec)                         # dwell time (s) per bin
 bits_per_spike, bits_per_sec = bl.spatial_information(rmap, occ)
-print("%.3f bits/spike, %.3f bits/s" % (bits_per_spike, bits_per_sec))
+print(f"{bits_per_spike:.3f} bits/spike, {bits_per_sec:.3f} bits/s")
 ```
 
 A grid cell like t2 c3 should score well above a spatially uninformative cell.
@@ -122,6 +122,9 @@ You should see the tell-tale hexagonal firing lattice of a grid cell.
 ## Where to go next
 
 Everything above runs off one `Recording`, and every analysis takes only a
-`Recording` — so the same code will work unchanged when the Neuropixels front
-end lands. Run `examples/quickstart.py <trial> 2 3` for the script version, and
-see the analysis modules in `src/barrylab/analysis/` for what else is ported.
+`Recording` — so the exact same code runs on Neuropixels data too, via
+`bl.load_neuropixels(...)` (experimental — see the
+[README](../README.md#neuropixels-experimental)). Run
+`examples/quickstart.py <trial> 2 3` for the script version, browse the
+["What's here" tour in the README](../README.md#whats-here) for every analysis
+area, and see the analysis modules in `src/barrylab/analysis/`.
