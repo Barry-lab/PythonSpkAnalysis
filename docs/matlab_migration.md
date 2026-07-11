@@ -30,7 +30,7 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `skaggsInfo.m` | `spatial_information(rates, dwell_times)` | public |
 | `skaggsAdaptiveBinning.m` | `adaptive_binning(dwell_times, spikes, alpha=200)` | public |
 | `default_vars.m` | `barrylab.params` | subset ported so far |
-| `xPearson.m` (`Analysis_General`) | `spatial_autocorrelogram(rate_map)` | public — the SAC |
+| `xPearson.m` (`Analysis_General`) | `spatial_autocorrelogram(rate_map)` / `cross_correlogram(a, b)` | public — `xPearson` is the general Pearson-correlation-at-all-lags primitive (one arg = autocorrelation = the SAC; two args = cross-correlation). These two wrappers are its autocorr and cross-corr uses. |
 | `multiGridness.m` | `gridness(sac)` → `(standard, expanding)` | public |
 | `sacProps.m` | `grid_properties(sac)` | public — scale/orientation/peaks |
 | `fs_fastGridness.m` | `analysis.grid.fast_gridness(sac)` → `(standard, expanding, scale)` | public — NOT bit-comparable to `gridness`/`grid_properties`, see its docstring |
@@ -39,7 +39,7 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `fftVars.m` | `analysis.spatial_fft.FFTParams` | public — parameter dataclass; `max_rad` is a derived property |
 | `get_2d_fft.m` | `analysis.spatial_fft.power_spectrum_2d(rate_map, fft_size, smth_sig, max_rad)` | public — mean-normalised, zero-padded 2-D FFT power spectrum |
 | `get_polar_fft.m` | `analysis.spatial_fft.to_polar_fft(ps2d, max_rad, th_bin, r_bin, sigma)` | public — polar (angle/radius) reorganisation of a 2-D FFT power spectrum |
-| `main_spatial_fft2.m` | `analysis.spatial_fft.grid_fft_components(recording, electrode, cluster, ...)` | public — Recording-level redesign like `crunch_decode`, not bit-exact; `main_spatial_fft.m` (v1) superseded, not ported |
+| `main_spatial_fft2.m` | `analysis.spatial_fft.grid_fft_components(recording, electrode, cluster, ...)` | public — Recording-level redesign like `decode_crunch_data`, not bit-exact; `main_spatial_fft.m` (v1) superseded, not ported |
 | `cb_circMean.m` | `circular_mean(angles, weights, wrap=...)` | public — circular mean; see `wrap` note below |
 | `dir_kldiv.m` / `kldiv.m` | `directionality(tuning_curve)` | public — directionality index |
 | `circ_FTT.m` | `directional_fft(tuning_curve)` | public — multimodal/hexadirectional |
@@ -53,11 +53,11 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `spatialCorrelation.m` | `spatial_correlation(rm1, rm2, stack_maps=True)` | public — remapping/stability |
 | `nan_corr.m` | `nan_corr(var1, var2, corr_type="pearson")` | public — NaN/Inf-safe correlation |
 | `get_true_PPM_boundingBox.m` | `true_ppm_bounding_box(occupancy, bin_px, env_m)` | public — infer true PPM |
-| `decode_calcPost.m` | `bayesian_posterior(obs_spk, rate_maps, t_bin)` | public — naive ML Poisson decoder |
-| `decode_getSpkCnt.m` | `spike_counts_per_window(...)` | public — windowed spike counts |
-| `decode_processPost.m` | `decode_maximum_likelihood(post, recording, bin_px, win_lim)` | public — ML decode + error |
-| `decode_calcBayesPost.m` | `bayesian_posterior_with_prior(...)` | public — full Bayes + movement prior |
-| `decode_crunchData.m` | `crunch_decode(recording, cells, ...)` | public — Recording-level orchestrator (redesign, not bit-exact) |
+| `decode_calcPost.m` | `decode_calc_post(obs_spk, rate_maps, t_bin)` | public — naive ML Poisson decoder |
+| `decode_getSpkCnt.m` | `decode_get_spike_counts(...)` | public — windowed spike counts |
+| `decode_processPost.m` | `decode_process_post(post, recording, bin_px, win_lim)` | public — ML decode + error |
+| `decode_calcBayesPost.m` | `decode_calc_bayes_post(...)` | public — full Bayes + movement prior |
+| `decode_crunchData.m` | `decode_crunch_data(recording, cells, ...)` | public — Recording-level orchestrator (redesign, not bit-exact) |
 | `circ_regress_cb.m` | `circular_linear_regression(x, t, k, pp_dir)` | public — phase precession fit |
 | `lineTraj_decode.m` | `line_trajectory.best_line(pmat, t_bin_sz, s_bin_sz, y_range)` | public — best-fit replay trajectory |
 | `lineTraj_reget_lnBnd.m` | `line_trajectory.reget_line_band(...)` | public — rebuild a line-band mask for another pMat |
@@ -75,7 +75,7 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `fs_masterAnalysis.m` watershed step + `fs_fixWatershed.m` | `field_shuffle.watershed_fields(rate_map, occupancy)` | public — needs `barrylab[fieldshuffle]` |
 | `fs_binMembLoc.m` | `field_shuffle.field_bin_locations(labels, rate_map)` | public — needs `barrylab[fieldshuffle]` |
 | `fs_shufFields.m` | `field_shuffle.shuffle_fields(shape, field_bin_loc, static_bin, rng=...)` | public — involves genuine randomness, see docstring/`FINDINGS.md` |
-| `fs_masterAnalysis.m` | `field_shuffle.field_shuffle_significance(recording, electrode, cluster, ...)` | public — Recording-level redesign like `crunch_decode`, not bit-exact |
+| `fs_masterAnalysis.m` | `field_shuffle.field_shuffle_significance(recording, electrode, cluster, ...)` | public — Recording-level redesign like `decode_crunch_data`, not bit-exact |
 | `identify_grid_cell.m` | `field_shuffle.is_grid_cell(recording, electrode, cluster, ...)` | public — see docstring/`FINDINGS.md` for 2 genuine MATLAB bugs found, not reproduced |
 | `read_INP_file.m` | `io.axona.read_inp(path)` | public — digital-timestamp (button/DIO) events; validated structurally, no example `.inp` ships with `Example_data` |
 | `read_stm_file.m` | `io.axona.read_stm(path)` | public — stimulator-timestamp events; validated structurally, no example `.stm` ships with `Example_data` |

@@ -376,7 +376,7 @@ def field_shuffle_significance(
     """Gridness of a cell vs. its own temporal- and field-shuffle distributions.
 
     A ``Recording``-level redesign of ``fs_masterAnalysis.m`` (like
-    :func:`~barrylab.analysis.decoding.crunch_decode` -- validate the
+    :func:`~barrylab.analysis.decoding.decode_crunch_data` -- validate the
     component functions individually; this end-to-end orchestrator is not
     bit-exact, and its field-shuffle step involves genuine randomness that
     can never be bit-exact regardless, see :func:`shuffle_fields`).
@@ -397,7 +397,7 @@ def field_shuffle_significance(
        ``rotRng=[...]*50``) rather than reading it from the data -- fine for
        its DACQ-only context (always 50 Hz) but not generalisable. This
        ``Recording``-based redesign uses ``recording.pos_sample_rate``
-       directly instead, consistent with how ``crunch_decode`` already
+       directly instead, consistent with how ``decode_crunch_data`` already
        generalises the same kind of MATLAB DACQ-specific assumption
        elsewhere in this package.
 

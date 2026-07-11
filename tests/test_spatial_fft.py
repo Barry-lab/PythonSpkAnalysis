@@ -263,7 +263,7 @@ def test_smooth_polar_fft_does_not_wrap_the_radial_axis():
 
 # --------------------------------------------------------------------------
 # grid_fft_components (main_spatial_fft2.m) -- Recording-level orchestrator.
-# Redesigned around Recording like crunch_decode/field_shuffle_significance;
+# Redesigned around Recording like decode_crunch_data/field_shuffle_significance;
 # not bit-exact. Validated structurally + a synthetic known-orientation/
 # known-wavelength grating (the 2-D analogue of test_grid_phase.py's
 # hand-built known-peak fixture), plus a real example grid cell.

@@ -4,64 +4,64 @@ import numpy as np
 from scipy.stats import poisson
 
 from barrylab.analysis.decoding import (
-    bayesian_posterior,
-    bayesian_posterior_with_prior,
-    decode_maximum_likelihood,
-    spike_counts_per_window,
+    decode_calc_post,
+    decode_calc_bayes_post,
+    decode_process_post,
+    decode_get_spike_counts,
 )
 
 
-def test_bayesian_posterior_matches_poisson_pmf():
+def test_decode_calc_post_matches_poisson_pmf():
     # 1 cell, 2 spatial bins, rates 2Hz and 5Hz, t_bin=1s, 3 observed spikes
     rm = np.array([[[2.0], [5.0]]])  # (ny=1, nx=2, n_cells=1)
     obs = np.array([[3.0]])
-    post = bayesian_posterior(obs, rm, t_bin=1.0, normalise=False)
+    post = decode_calc_post(obs, rm, t_bin=1.0, normalise=False)
     expected = [poisson.pmf(3, 2.0), poisson.pmf(3, 5.0)]
     assert np.allclose(post.ravel(), expected, rtol=1e-6)
 
 
-def test_bayesian_posterior_normalises_to_one():
+def test_decode_calc_post_normalises_to_one():
     rng = np.random.RandomState(0)
     rm = rng.uniform(0.5, 5.0, size=(5, 5, 3))
     obs = rng.poisson(2, size=(3, 4)).astype(float)
-    post = bayesian_posterior(obs, rm, t_bin=0.5, normalise=True)
+    post = decode_calc_post(obs, rm, t_bin=0.5, normalise=True)
     assert np.allclose(post.sum(axis=(0, 1)), 1.0)
 
 
-def test_bayesian_posterior_rejects_cell_mismatch():
+def test_decode_calc_post_rejects_cell_mismatch():
     import pytest
 
     with pytest.raises(ValueError):
-        bayesian_posterior(np.ones((2, 5)), np.ones((3, 3, 3)), t_bin=0.5)
+        decode_calc_post(np.ones((2, 5)), np.ones((3, 3, 3)), t_bin=0.5)
 
 
-def test_spike_counts_per_window_no_overlap():
+def test_decode_get_spike_counts_no_overlap():
     spikes = np.array([0, 0, 5, 5, 9, 15])
-    counts, win_lim = spike_counts_per_window(spikes, (0, 15), win_width=5)
+    counts, win_lim = decode_get_spike_counts(spikes, (0, 15), win_width=5)
     assert win_lim.tolist() == [[0, 4], [5, 9], [10, 14]]
     assert counts.tolist() == [2.0, 3.0, 0.0]
 
 
-def test_spike_counts_per_window_overlap_sums_correctly():
+def test_decode_get_spike_counts_overlap_sums_correctly():
     spikes = np.array([2.0])  # single spike at possamp 2
-    counts, win_lim = spike_counts_per_window(spikes, (0, 9), win_width=4, win_overlap=0.5)
+    counts, win_lim = decode_get_spike_counts(spikes, (0, 9), win_width=4, win_overlap=0.5)
     # the spike at possamp 2 should be counted in every window whose [start,end] contains it
     contains_spike = (win_lim[:, 0] <= 2) & (2 <= win_lim[:, 1])
     assert np.array_equal(counts > 0, contains_spike)
     assert counts[contains_spike].tolist() == [1.0] * contains_spike.sum()
 
 
-def test_spike_counts_per_window_rejects_full_overlap():
+def test_decode_get_spike_counts_rejects_full_overlap():
     import pytest
 
     with pytest.raises(ValueError):
-        spike_counts_per_window(np.array([0.0]), (0, 10), win_width=4, win_overlap=1.0)
+        decode_get_spike_counts(np.array([0.0]), (0, 10), win_width=4, win_overlap=1.0)
 
 
-def test_spike_counts_per_window_smoothing_preserves_total_mass():
+def test_decode_get_spike_counts_smoothing_preserves_total_mass():
     spikes = np.array([5.0, 5.0, 5.0])
-    counts_raw, _ = spike_counts_per_window(spikes, (0, 19), win_width=20, win_smooth=0.0)
-    counts_smooth, _ = spike_counts_per_window(spikes, (0, 19), win_width=20, win_smooth=1.5)
+    counts_raw, _ = decode_get_spike_counts(spikes, (0, 19), win_width=20, win_smooth=0.0)
+    counts_smooth, _ = decode_get_spike_counts(spikes, (0, 19), win_width=20, win_smooth=1.5)
     # a single window spanning the whole range: smoothing shouldn't create or destroy spikes
     assert np.isclose(counts_raw[0], 3.0)
     assert np.isclose(counts_smooth[0], 3.0, atol=0.05)
@@ -93,7 +93,7 @@ def test_decode_recovers_position_from_clean_place_fields():
         r, c = true_bins[w]
         obs_spk[:, w] = rng.poisson(rate_maps[r, c, :] * t_bin)
 
-    post = bayesian_posterior(obs_spk, rate_maps, t_bin)
+    post = decode_calc_post(obs_spk, rate_maps, t_bin)
     dec_bins = np.zeros((n_windows, 2), dtype=int)
     for w in range(n_windows):
         flat = np.nanargmax(post[:, :, w].ravel(order="F"))
@@ -104,19 +104,19 @@ def test_decode_recovers_position_from_clean_place_fields():
     assert err_bins.mean() < chance_level / 2
 
 
-def test_bayesian_posterior_with_prior_normalises_and_is_finite():
+def test_decode_calc_bayes_post_normalises_and_is_finite():
     rng = np.random.RandomState(1)
     ny, nx, n_cells, n_time = 10, 10, 3, 25
     rate_maps = rng.uniform(0.5, 5.0, size=(ny, nx, n_cells))
     dwell = rng.uniform(0.5, 2.0, size=(ny, nx))
     obs = rng.poisson(2, size=(n_cells, n_time)).astype(float)
-    post = bayesian_posterior_with_prior(obs, rate_maps, dwell, t_bin=0.5)
+    post = decode_calc_bayes_post(obs, rate_maps, dwell, t_bin=0.5)
     assert post.shape == (ny, nx, n_time)
     sums = np.nansum(post, axis=(0, 1))
     assert np.allclose(sums, 1.0, atol=1e-6)
 
 
-def test_decode_maximum_likelihood_zero_error_when_post_matches_true_bin():
+def test_decode_process_post_zero_error_when_post_matches_true_bin():
     """If the posterior is a clean delta at the animal's true bin, decode
     error should be ~0."""
 
@@ -133,6 +133,6 @@ def test_decode_maximum_likelihood_zero_error_when_post_matches_true_bin():
     post = np.zeros((ny, nx, 2))
     post[3, 2, :] = 1.0  # row=3 (y), col=2 (x) -> matches the fixed true location
 
-    err, dec_xy, true_xy, ml_val = decode_maximum_likelihood(post, rec, bin_px, win_lim)
+    err, dec_xy, true_xy, ml_val = decode_process_post(post, rec, bin_px, win_lim)
     assert np.allclose(err, 0.0, atol=1e-9)
     assert np.allclose(ml_val, 1.0)

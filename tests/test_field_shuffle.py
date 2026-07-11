@@ -279,7 +279,7 @@ def test_shuffle_fields_runs_on_example_grid_cell(example_trial):
 
 # --------------------------------------------------------------------------
 # field_shuffle_significance / is_grid_cell (fs_masterAnalysis.m /
-# identify_grid_cell.m) -- Recording-level redesigns (like crunch_decode),
+# identify_grid_cell.m) -- Recording-level redesigns (like decode_crunch_data),
 # not bit-exact, and inheriting shuffle_fields' genuine randomness. See
 # their docstrings/FINDINGS.md for two real MATLAB bugs found while reading
 # fs_masterAnalysis.m/identify_grid_cell.m that are NOT reproduced here

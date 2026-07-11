@@ -1,17 +1,19 @@
-"""Bayesian population decoding of position from spike counts.
+"""Population decoding of position from spike counts.
 
-Ports the core of ``Decoding/``:
+Ports the core of ``Decoding/`` -- both the naive maximum-likelihood Poisson
+decoder (``decode_calc_post``) and the full Bayesian decoder with occupancy +
+movement priors (``decode_calc_bayes_post``):
 
-- :func:`spike_counts_per_window` — spike counts per (optionally overlapping,
+- :func:`decode_get_spike_counts` — spike counts per (optionally overlapping,
   optionally Gaussian-smoothed) time window (``decode_getSpkCnt.m``).
-- :func:`bayesian_posterior` — naive maximum-likelihood Poisson population
+- :func:`decode_calc_post` — naive maximum-likelihood Poisson population
   decoder (``decode_calcPost.m``).
-- :func:`bayesian_posterior_with_prior` — full Bayesian decoder with a spatial
+- :func:`decode_calc_bayes_post` — full Bayesian decoder with a spatial
   occupancy prior and a sequential movement (closeness) prior
   (``decode_calcBayesPost.m``, Zhang et al. 1998 eq. 36).
-- :func:`decode_maximum_likelihood` — turn a posterior into decoded positions
+- :func:`decode_process_post` — turn a posterior into decoded positions
   and measure accuracy against ground truth (``decode_processPost.m``).
-- :func:`crunch_decode` — a Recording-level convenience orchestrator (a
+- :func:`decode_crunch_data` — a Recording-level convenience orchestrator (a
   redesign of ``decode_crunchData.m`` around :class:`~barrylab.core.recording.Recording`;
   validate its pieces individually, this end-to-end wrapper is not bit-exact).
 """
@@ -44,7 +46,7 @@ def _gaussian_kernel_1d(sigma):
     return h / h.sum()
 
 
-def spike_counts_per_window(spike_pos, start_end_pos, win_width, win_overlap=0.0, win_smooth=0.0):
+def decode_get_spike_counts(spike_pos, start_end_pos, win_width, win_overlap=0.0, win_smooth=0.0):
     """Spike counts per time window, with optional overlap/smoothing.
 
     Port of ``decode_getSpkCnt.m``. All positions/widths are in position-sample
@@ -110,7 +112,7 @@ def spike_counts_per_window(spike_pos, start_end_pos, win_width, win_overlap=0.0
     return spike_count, win_lim
 
 
-def bayesian_posterior(obs_spk, rate_maps, t_bin, normalise=True):
+def decode_calc_post(obs_spk, rate_maps, t_bin, normalise=True):
     """Naive maximum-likelihood Poisson population decoder.
 
     Port of ``decode_calcPost.m``. For each time bin, compares observed spike
@@ -151,13 +153,13 @@ def bayesian_posterior(obs_spk, rate_maps, t_bin, normalise=True):
     return post
 
 
-def bayesian_posterior_with_prior(
+def decode_calc_bayes_post(
     obs_spk, rate_maps, dwell_map, t_bin, n_step_for_vel=15, speed_scale_fact=5.0
 ):
     """Full Bayesian decoder: spike likelihood x spatial prior x movement prior.
 
     Port of ``decode_calcBayesPost.m`` (Zhang et al. 1998, eq. 36 + a sequential
-    "closeness" prior). Unlike :func:`bayesian_posterior`, this also uses the
+    "closeness" prior). Unlike :func:`decode_calc_post`, this also uses the
     overall occupancy (as a spatial prior) and assumes the animal is unlikely
     to have moved far from its own just-decoded location — applied as a 2-D
     Gaussian centred on the previous decode, with sigma set from the recent
@@ -233,7 +235,7 @@ def bayesian_posterior_with_prior(
     return post
 
 
-def decode_maximum_likelihood(post, recording, bin_px, win_lim):
+def decode_process_post(post, recording, bin_px, win_lim):
     """Decode ML position from a posterior and measure accuracy.
 
     Port of ``decode_processPost.m``. Time bins whose posterior is all-NaN are
@@ -264,15 +266,15 @@ def decode_maximum_likelihood(post, recording, bin_px, win_lim):
     Parameters
     ----------
     post : ndarray (n_y, n_x, n_time_bins)
-        Posterior from :func:`bayesian_posterior` or
-        :func:`bayesian_posterior_with_prior`.
+        Posterior from :func:`decode_calc_post` or
+        :func:`decode_calc_bayes_post`.
     recording : Recording
         Source of ground-truth position (``recording.xy``).
     bin_px : float
         Spatial bin size in pixels (matching what built ``post``'s grid).
     win_lim : ndarray (n_time_bins, 2)
         ``[start, end]`` position sample (inclusive, 0-based) per time window,
-        from :func:`spike_counts_per_window`.
+        from :func:`decode_get_spike_counts`.
 
     Returns
     -------
@@ -315,7 +317,7 @@ def decode_maximum_likelihood(post, recording, bin_px, win_lim):
     return err, dec_xy, true_xy, ml_val
 
 
-def crunch_decode(
+def decode_crunch_data(
     recording,
     cells,
     t_bin=0.5,
@@ -385,7 +387,7 @@ def crunch_decode(
         rm, _, _ = smooth_ratemap(occ_train, spk_map, 5, "boxcar")
         rate_maps.append(rm)
 
-        counts, win_lim = spike_counts_per_window(
+        counts, win_lim = decode_get_spike_counts(
             spk_idx_all,
             (test_start, test_end),
             win_width_samp,
@@ -397,8 +399,8 @@ def crunch_decode(
     rate_maps = np.stack(rate_maps, axis=2)
     spike_counts = np.stack(spike_counts, axis=0)
 
-    post = bayesian_posterior(spike_counts, rate_maps, t_bin)
-    err_px, dec_xy_px, true_xy_px, ml_val = decode_maximum_likelihood(
+    post = decode_calc_post(spike_counts, rate_maps, t_bin)
+    err_px, dec_xy_px, true_xy_px, ml_val = decode_process_post(
         post, recording, bin_px, win_lim
     )
 

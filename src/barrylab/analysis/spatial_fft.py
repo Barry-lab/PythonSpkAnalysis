@@ -12,7 +12,7 @@ lab "for understanding, to test rigour and for speed":
   (angle, radius) coordinates, mean-aggregated per bin, with optional
   circular-in-angle Gaussian smoothing (``get_polar_fft.m``).
 - :func:`grid_fft_components` -- the ``Recording``-level orchestrator (a
-  redesign of ``main_spatial_fft2.m``, like :func:`~barrylab.analysis.decoding.crunch_decode`
+  redesign of ``main_spatial_fft2.m``, like :func:`~barrylab.analysis.decoding.decode_crunch_data`
   and :func:`~barrylab.analysis.field_shuffle.field_shuffle_significance`):
   builds an unsmoothed ratemap, gets its 2-D and polar FFT, and tests each
   angular Fourier component for significance against a temporal-shuffle null
@@ -389,7 +389,7 @@ def grid_fft_components(recording, electrode, cluster, params=None, n_shuffles=N
     """Significant 2-D FFT spatial-frequency components of a cell's ratemap.
 
     A ``Recording``-level redesign of ``main_spatial_fft2.m`` (like
-    :func:`~barrylab.analysis.decoding.crunch_decode` and
+    :func:`~barrylab.analysis.decoding.decode_crunch_data` and
     :func:`~barrylab.analysis.field_shuffle.field_shuffle_significance` --
     validate the component functions (:func:`power_spectrum_2d`,
     :func:`to_polar_fft`) individually; this orchestrator is intentionally

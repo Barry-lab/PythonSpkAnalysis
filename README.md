@@ -131,12 +131,12 @@ Recording-level convenience wrapper that builds rate maps on a training split
 and decodes a held-out test split.
 
 ```python
-result = bl.crunch_decode(rec, cells=[(2, 3), (2, 1), (3, 4)], t_bin=0.25)
+result = bl.decode_crunch_data(rec, cells=[(2, 3), (2, 1), (3, 4)], t_bin=0.25)
 print(result["err"].mean(), "cm mean decode error")
 ```
 
-Lower-level pieces (`bl.bayesian_posterior`, `bl.bayesian_posterior_with_prior`,
-`bl.spike_counts_per_window`, `bl.decode_maximum_likelihood`) are all public
+Lower-level pieces (`bl.decode_calc_post`, `bl.decode_calc_bayes_post`,
+`bl.decode_get_spike_counts`, `bl.decode_process_post`) are all public
 too if you want to build your own pipeline.
 
 ### Replay / trajectory scoring
