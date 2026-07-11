@@ -25,16 +25,14 @@ from .maps import smooth_ratemap, spike_map
 
 # "Small value" added to expected spike counts to avoid literal zeros (a rate
 # map bin at exactly 0 Hz makes a single observed spike there impossible,
-# i.e. probability 0 -- not useful). decode_calcPost.m and decode_calcBayesPost.m
-# share the identical originating comment for this, but as of the current
-# upstream MATLAB they've DIVERGED: decode_calcPost.m was fixed in 2020
+# i.e. probability 0 -- not useful). decode_calcPost.m was fixed in 2020
 # (eps^8 -> eps, since eps^8 is so vanishingly tiny it doesn't actually
-# prevent the zero-probability problem the comment describes) but that fix
-# was never propagated to decode_calcBayesPost.m, which still uses the old,
-# ineffective eps^8. Kept as two separate constants matching each function's
-# actual current MATLAB source, rather than one shared value -- see FINDINGS.md.
-_SMALL_V_CALC_POST = np.finfo(float).eps  # decode_calcPost.m (fixed upstream 2020)
-_SMALL_V_BAYES_POST = np.finfo(float).eps ** 8  # decode_calcBayesPost.m (not yet fixed upstream)
+# prevent the zero-probability problem the comment describes). That fix was
+# missing from the near-identical decode_calcBayesPost.m for years; it has
+# now been propagated there too (Universal_Matlab python-port-bugfixes commit
+# 55e0690, PI-approved), so both functions use eps and this port matches --
+# see FINDINGS.md.
+_SMALL_V = np.finfo(float).eps
 
 
 def _gaussian_kernel_1d(sigma):
@@ -78,7 +76,10 @@ def spike_counts_per_window(spike_pos, start_end_pos, win_width, win_overlap=0.0
         raise ValueError("win_overlap must be less than 1")
     spike_pos = np.asarray(spike_pos, dtype=float).ravel()
 
-    win_overlap_samp = int(round(win_width * win_overlap))
+    # MATLAB round() is half-away-from-zero; Python's round() is half-to-even
+    # (banker's). win_width*win_overlap is >= 0, so floor(x + 0.5) reproduces
+    # MATLAB exactly (it diverges on half-integers, e.g. width=5, overlap=0.5).
+    win_overlap_samp = int(np.floor(win_width * win_overlap + 0.5))
     n_pos_samp = start_end_pos[1] - start_end_pos[0] + 1
     win_advance = win_width - win_overlap_samp
     n_win = int(np.floor((n_pos_samp - win_width) / win_advance)) + 1
@@ -137,7 +138,7 @@ def bayesian_posterior(obs_spk, rate_maps, t_bin, normalise=True):
     if n_cells != rate_maps.shape[2]:
         raise ValueError("number of cells in obs_spk and rate_maps must match")
 
-    expected = (rate_maps + _SMALL_V_CALC_POST) * t_bin  # (ny, nx, n_cells)
+    expected = (rate_maps + _SMALL_V) * t_bin  # (ny, nx, n_cells)
     expon = np.exp(-expected)
     factorial = gamma(obs_spk + 1)  # (n_cells, n_time)
 
@@ -190,7 +191,7 @@ def bayesian_posterior_with_prior(
 
     px = dwell_map / np.nansum(dwell_map)
 
-    expected = (rate_maps + _SMALL_V_BAYES_POST) * t_bin
+    expected = (rate_maps + _SMALL_V) * t_bin
     expon = np.exp(-expected)
     working = (expected[:, :, :, None] ** obs_spk[None, None, :, :]) * expon[:, :, :, None]
     post = np.prod(working, axis=2)
@@ -208,7 +209,12 @@ def bayesian_posterior_with_prior(
     for n in range(n_time):
         post[:, :, n] = post[:, :, n] * p_new_x_given_x
 
-        if n >= n_step_for_vel:
+        # MATLAB (1-based) updates the closeness prior when `nn >= nStepForVel`,
+        # i.e. first on the nStepForVel-th iteration. In 0-based indexing that
+        # is `n >= n_step_for_vel - 1` -- using `n >= n_step_for_vel` here would
+        # start the movement prior one time-window too late (an off-by-one from
+        # the 1-based->0-based translation).
+        if n >= n_step_for_vel - 1:
             p_new_x_given_x = np.exp(-(((xx - j_s) ** 2 + (yy - i_s) ** 2) / (2 * sigma**2)))
             p_new_x_given_x = p_new_x_given_x / p_new_x_given_x.sum()
 
@@ -231,7 +237,21 @@ def decode_maximum_likelihood(post, recording, bin_px, win_lim):
     """Decode ML position from a posterior and measure accuracy.
 
     Port of ``decode_processPost.m``. Time bins whose posterior is all-NaN are
-    left as NaN in the output (use this to skip specific windows).
+    left as NaN in the output (``err``/``dec_xy``/``ml_val`` all NaN), so you
+    can skip specific windows by NaN-ing their posterior.
+
+    .. note::
+       **All-NaN windows: this port follows the MATLAB docstring's intent, not
+       its literal code.** ``decode_processPost.m`` documents NaN-ing a window
+       as the way to "ignore" it, but its code doesn't implement that: MATLAB's
+       ``max()`` of an all-NaN column returns value NaN at index 1, so the
+       window is decoded to bin 1 (top-left) and produces a *spurious, finite*
+       error — the "ignore" feature is silently broken. This port instead
+       leaves all-NaN windows as NaN throughout, which is what the MATLAB
+       docstring promises and what makes the skip feature actually work.
+       Partly-NaN posteriors (the normal case — unvisited bins are NaN) behave
+       identically to MATLAB: the peak is taken over the finite bins only
+       (``nanargmax`` = MATLAB ``max`` ignoring NaN). See ``FINDINGS.md``.
 
     .. note::
        The original MATLAB's "if several bins are jointly maximal, pick one at

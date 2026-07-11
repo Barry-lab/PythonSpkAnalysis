@@ -361,8 +361,13 @@ def eeg_convert_to_volts(samples, eeg_channel, settings, kind="eeg"):
         Raw signed counts from :func:`_read_eeg` (``kind="eeg"``, int8) or
         :func:`_read_egf` (``kind="egf"``, int16).
     eeg_channel : int
-        The 1-based EEG channel number (matches ``EEG_ch_N``/``saveEEG_ch_N``
-        in the ``.set`` file).
+        The 1-based **actual hardware recording channel** the EEG was captured
+        on (``eegCh`` in ``eeg_convert_to_volts.m``) -- i.e. the *value* of
+        ``EEG_ch_{slot}`` in the ``.set`` file, NOT the EEG slot number. The
+        gain is looked up as ``gain_ch_{eeg_channel-1}`` (the ``.set``'s
+        ``gain_ch_*`` keys are 0-based hardware channels). :func:`load_dacq`
+        resolves the slot to this actual channel for you; pass the actual
+        channel here if calling directly.
     settings : Header
         The parsed ``.set`` header.
     kind : {"eeg", "egf"}
@@ -385,7 +390,8 @@ def eeg_convert_to_volts(samples, eeg_channel, settings, kind="eeg"):
     else:
         raise ValueError("kind must be 'eeg' or 'egf'")
 
-    # eeg_channel is 1-based; the .set file's gain_ch_N keys are 0-based.
+    # eeg_channel is the 1-based actual hardware channel; the .set file's
+    # gain_ch_N keys are 0-based hardware channels.
     gain = key_value(settings, f"gain_ch_{eeg_channel - 1}", "num", exact=True)
     return (conv_factor / gain) * samples
 
@@ -401,7 +407,16 @@ def _active_eeg_channels(settings, max_channels=16):
 
 
 def _load_lfp_channel(stem, channel, settings):
-    """Load one EEG channel's data (prefers the high-rate .egf if present)."""
+    """Load one EEG channel's data (prefers the high-rate .egf if present).
+
+    ``channel`` is the EEG *slot* (1..16, i.e. ``saveEEG_ch_N``): the file
+    suffix is derived from it (``.egf``/``.egf2``/...). The per-channel gain,
+    however, is keyed by the *actual hardware recording channel*, which is the
+    value of ``EEG_ch_{slot}`` in the ``.set`` file -- NOT the slot itself
+    (matching ``read_DACQ.m``, which stores ``eeg.eegCh``=slot and
+    ``eeg.actualCh``=``EEG_ch_{slot}`` and gains off ``actualCh``). Conflating
+    the two silently scaled loaded voltages by the wrong per-channel gain.
+    """
     suffix = "" if channel == 1 else str(channel)
     egf_path = f"{stem}.egf{suffix}"
     eeg_path = f"{stem}.eeg{suffix}"
@@ -415,11 +430,17 @@ def _load_lfp_channel(stem, channel, settings):
     else:
         return None
 
-    volts = eeg_convert_to_volts(raw, channel, settings, kind=kind)
+    # Resolve the actual hardware channel this EEG slot was recorded on; the
+    # gain is keyed by that, not by the slot number. Fall back to the slot if
+    # the key is absent (older/hand-made .set files).
+    actual = key_value(settings, f"EEG_ch_{channel}", "num", exact=True)
+    hardware_channel = int(actual) if actual is not None else channel
+    volts = eeg_convert_to_volts(raw, hardware_channel, settings, kind=kind)
     return {
         "samples": volts,
         "sample_rate": key_value(header, "sample_rate", "num"),
         "channel": channel,
+        "hardware_channel": hardware_channel,
         "kind": kind,
     }
 

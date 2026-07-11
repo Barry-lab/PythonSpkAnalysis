@@ -79,3 +79,24 @@ def test_eeg_convert_to_volts_rejects_unknown_kind():
     settings = [("ADC_fullscale_mv", "1500"), ("gain_ch_0", "1000")]
     with pytest.raises(ValueError):
         eeg_convert_to_volts(np.array([1.0]), 1, settings, kind="bogus")
+
+
+def test_load_lfp_gain_uses_actual_hardware_channel_not_slot(example_trial):
+    """Regression for the slot-vs-actual-channel gain bug: the per-channel gain
+    must be keyed by the hardware channel (value of EEG_ch_{slot}), not the EEG
+    slot number. Exercises the full load path (the direct eeg_convert_to_volts
+    unit test bypasses it). On r1838, EEG slot 1 -> hardware channel 4 ->
+    gain_ch_3, NOT gain_ch_0."""
+    import barrylab as bl
+    from barrylab.io._axona_files import key_value, read_axona_file
+    from barrylab.io.axona import _read_egf
+
+    rec = bl.load_dacq(example_trial, load_lfp=[1])
+    settings, _ = read_axona_file(example_trial + ".set", has_binary=False)
+    raw, _ = _read_egf(example_trial + ".egf")
+
+    actual = int(key_value(settings, "EEG_ch_1", "num", exact=True))
+    assert rec.lfp[1]["hardware_channel"] == actual  # slot 1 resolved to its hw channel
+    gain = key_value(settings, f"gain_ch_{actual - 1}", "num", exact=True)
+    expected = (1.5 / gain) * (raw / 32768.0)
+    np.testing.assert_allclose(rec.lfp[1]["samples"], expected)
