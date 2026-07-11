@@ -7,22 +7,28 @@ common `Recording` object so the same analysis code runs unchanged regardless
 of what acquisition system the spikes came from.
 
 This is a Python port of the Barry lab's MATLAB toolbox,
-[`Universal_Matlab`](https://github.com/Barry-lab/Universal_Matlab), done
-with an AI-assisted, source-read-and-validated process rather than by hand —
-see [Provenance & validation](#provenance--validation) below before relying
-on it for a paper. `Universal_Matlab` remains the reference implementation
-until a lab member has reviewed this port properly.
+[`Universal_Matlab`](https://github.com/Barry-lab/Universal_Matlab) — see
+[Provenance & validation](#provenance--validation) below before relying on it
+for a paper. `Universal_Matlab` remains the reference implementation until a
+lab member has reviewed this port properly.
 
 ## Install
 
+Clone and install in editable mode (it's not on PyPI):
+
 ```bash
-pip install -e ".[dev,plot]"          # or: uv pip install -e ".[dev,plot]"
+git clone https://github.com/Barry-lab/PythonSpkAnalysis.git
+cd PythonSpkAnalysis
+pip install -e ".[plot]"          # or: uv pip install -e ".[plot]"
 ```
 
-Requires Python ≥ 3.9. Everything below works out of the box for DACQ data;
-`[fieldshuffle]` (scikit-image, for the watershed-based field-shuffle test)
-and `[neuropixels]`/`[nwb]` (for the not-yet-built Neuropixels/NWB front
-ends) are separate extras so a DACQ-only install stays lightweight.
+Requires Python ≥ 3.9. The base install + `[plot]` (matplotlib, for the
+figures below) covers everything DACQ. Optional extras — installed the same
+editable way, e.g. `pip install -e ".[fieldshuffle]"` — add:
+`[fieldshuffle]` (scikit-image, for the watershed field-shuffle test),
+`[neuropixels]` (SpikeInterface, for the experimental Neuropixels loader),
+`[nwb]`, and `[dev]` (pytest/ruff/mypy, for contributors — see
+[`CONTRIBUTING.md`](CONTRIBUTING.md)).
 
 ## Quickstart
 
@@ -47,10 +53,13 @@ version.
 
 Grouped the same way the original MATLAB toolbox is (`Analysis_Grid`,
 `Analysis_Dir`, `Decoding`, `Analysis_Freq`, ...) so it's easy to find the
-Python equivalent of a function you already know. Every snippet below is
-runnable once you have a `rec` from `load_dacq` (and `import numpy as np` for
-the couple that need it) — see [`docs/matlab_migration.md`](docs/matlab_migration.md)
-for the complete function-by-function map to the MATLAB originals.
+Python equivalent of a function you already know. Most snippets below run as
+written once you have a `rec` from `load_dacq`; a few take extra inputs shown
+as placeholders (a second rate map `rmap_a`/`rmap_b`, a decoded
+`posterior_matrix`, your in-field `position_in_field`/`theta_phase`), and a
+couple need `import numpy as np`. See
+[`docs/matlab_migration.md`](docs/matlab_migration.md) for the full
+function-by-function map to the MATLAB originals.
 
 ### Rate maps & spatial information
 
@@ -69,9 +78,13 @@ firing pattern is), grid scale/orientation, elliptical-distortion correction,
 and cross-cell phase comparison for two cells from the same grid module.
 
 ```python
+gridness_score, scale_cm = bl.grid_score(rec, 2, 3)  # one-call: rate map -> SAC -> gridness + scale
+
+# or step through it yourself:
 sac = bl.spatial_autocorrelogram(rmap)
 standard_g, expanding_g = bl.gridness(sac)          # two classic gridness measures
 props = bl.grid_properties(sac)                     # scale, orientation, peak geometry
+sq = bl.square_grid_props(sac)                       # 4-fold (square) grid variant
 
 # correct for elliptical distortion before recomputing gridness
 ellipse = bl.fit_grid_ellipse(sac)                  # note: orientation is in RADIANS
@@ -80,6 +93,7 @@ corrected_sac = bl.regularise_elliptic_sac(
 )
 
 # relative spatial phase between two cells of the same grid module
+rmap_a, rmap_b = bl.rate_map(rec, 2, 3), bl.rate_map(rec, 2, 1)
 xsac = bl.cross_correlogram(rmap_a, rmap_b)
 phase = bl.cross_sac_props(xsac)                    # phase_mag, phase_ang, ...
 ```
@@ -98,8 +112,9 @@ hexadirectional (grid-cell) modulation of firing by heading.
 ```python
 hd_map = bl.head_direction_map(rec, 2, 3)
 stats = bl.head_direction_stats(rec, 2, 3)          # tuning curve + resultant length/direction/directionality in one dict
+r, preferred_deg = bl.resultant_vector(hd_map)      # Rayleigh mean-resultant length + preferred direction
 directionality = bl.directionality(hd_map)          # KL-divergence-based index, on its own
-hex_mod = bl.directional_fft(hd_map)                # 6-fold (and other) modulation
+power, freqs, rel_freq, rel_power = bl.directional_fft(hd_map)  # multimodal (e.g. 6-fold) tuning
 ```
 
 ### Place-field statistics
@@ -109,8 +124,9 @@ remapping/stability analyses).
 
 ```python
 fields = bl.field_stats(rmap, min_field_bins=9, min_rate=1.0)
-coherence = bl.spatial_coherence(rmap)
-stability = bl.spatial_correlation(rmap_session1, rmap_session2)
+coherence = bl.spatial_coherence(bl.rate_map(rec, 2, 3, smoothing=None))  # wants an UNsmoothed map
+rmap_session1, rmap_session2 = bl.rate_map(rec, 2, 3), bl.rate_map(rec, 2, 3)  # e.g. two halves / sessions
+corr, n_bins = bl.spatial_correlation(rmap_session1, rmap_session2)  # returns (correlation, n valid bins)
 ```
 
 ### Place × direction

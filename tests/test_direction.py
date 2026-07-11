@@ -5,12 +5,24 @@ import numpy as np
 from barrylab.analysis.direction import (
     circular_mean,
     directional_fft,
+    directional_occupancy,
     directionality,
     head_direction_map,
     head_direction_stats,
     led2v1_dir_offset,
     resultant_vector,
 )
+
+
+def test_directional_occupancy_bins_dwell_by_direction(example_trial):
+    import barrylab as bl
+
+    rec = bl.load_dacq(example_trial)
+    occ = directional_occupancy(rec, bin_deg=6.0)
+    assert occ.shape == (60,)  # 360 / 6
+    assert np.all(occ >= 0)
+    # total dwell time should equal the session duration (every sample binned once)
+    assert np.isclose(occ.sum(), rec.n_pos / rec.pos_sample_rate)
 
 
 def test_circular_mean_simple():

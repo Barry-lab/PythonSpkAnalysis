@@ -33,6 +33,8 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `xPearson.m` (`Analysis_General`) | `spatial_autocorrelogram(rate_map)` / `cross_correlogram(a, b)` | public — `xPearson` is the general Pearson-correlation-at-all-lags primitive (one arg = autocorrelation = the SAC; two args = cross-correlation). These two wrappers are its autocorr and cross-corr uses. |
 | `multiGridness.m` | `gridness(sac)` → `(standard, expanding)` | public |
 | `sacProps.m` | `grid_properties(sac)` | public — scale/orientation/peaks |
+| `sacProps90deg.m` | `analysis.grid.square_grid_props(sac)` | public — 4-fold (square) grid variant of `grid_properties` |
+| (convenience) | `grid_score(recording, electrode, cluster)` → `(gridness, scale_cm)` | public — one call: rate map → SAC → standard gridness + scale |
 | `fs_fastGridness.m` | `analysis.grid.fast_gridness(sac)` → `(standard, expanding, scale)` | public — NOT bit-comparable to `gridness`/`grid_properties`, see its docstring |
 | `xPearson.m` (cross mode) | `analysis.grid.cross_correlogram(rm_a, rm_b)` | public — cross-SAC between two rate maps |
 | `xSacProps.m` | `analysis.grid_phase.cross_sac_props(xsac)` | public — see docstring: a likely real MATLAB fragility on realistic data (check `peak_corr`), see `FINDINGS.md` |
@@ -44,6 +46,8 @@ object to every analysis. A rate map does not care whether the spikes came from 
 | `dir_kldiv.m` / `kldiv.m` | `directionality(tuning_curve)` | public — directionality index |
 | `circ_FTT.m` | `directional_fft(tuning_curve)` | public — multimodal/hexadirectional |
 | `led2v1_dir_offset.m` | `led2v1_dir_offset(led2_dir, led1_dir)` | public — 2-LED/1-LED heading bias |
+| (Rayleigh vector) | `resultant_vector(tuning_curve)` → `(r, preferred_deg)` | public — mean resultant length + preferred direction |
+| `bin_data('dir')` | `directional_occupancy(recording)` | public — dwell time per direction bin |
 | (HD tuning curve) | `head_direction_map` / `head_direction_stats` | public — bins by direction |
 | `pxd.m` | `pxd(spikes, times)` | public — place x direction ML fit |
 | `wrapper_pxd.m` | `place_by_direction(recording, electrode, cluster)` | public — bins + fits + smooths |

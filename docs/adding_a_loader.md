@@ -66,38 +66,35 @@ Electrode(identifier, spike_times, pos_index=None, clusters=None, metadata=None)
 `pos_index` truncation), so downstream `spike_mask` / `spike_pos_index` select
 the right samples.
 
-## Planned: `load_neuropixels` (design sketch, not yet implemented)
+## The second loader: `load_neuropixels` (a worked example)
 
-The v0.3 roadmap adds a Neuropixels front end. The intended shape — **not yet
-written** — reuses the same contract:
+`load_neuropixels` (`src/barrylab/io/neuropixels.py`, experimental) satisfies the
+same contract a very different way, so it's the clearest example of what a
+composite loader looks like. It does **not** read raw binary or spike-sort —
+that's Kilosort's job upstream. It reads *already-sorted* spikes plus a
+*separately-supplied* position track and fills a `Recording`:
 
 ```python
-def load_neuropixels(path, position_source=None):
-    """PLANNED — not implemented. Assemble a Recording from a Neuropixels trial."""
-    import spikeinterface.full as si
-
-    # 1. Spikes + probe geometry via SpikeInterface (SpikeGLX or Open Ephys
-    #    recording + a Kilosort4 sorting output).
-    recording_ext = si.read_spikeglx(path)          # or si.read_openephys(path)
-    sorting = si.read_kilosort(path / "kilosort4")
-
-    # 2. Position / behaviour + sync via a lab-owned step that aligns the
-    #    behavioural clock to the ephys clock and returns xy, direction,
-    #    speed, pos_times, pos_sample_rate, window, pixels_per_metre.
-    pos = load_position_and_sync(position_source)
-
-    # 3. Group units into Electrodes (e.g. one group, or by shank/depth) and
-    #    map each spike to a position sample:
-    #       pos_index = searchsorted(pos["times"], spike_times) - 1
-    #    Then build the Recording exactly as load_dacq does.
-    rec = Recording(name=path.stem, metadata={"format": "neuropixels"})
-    # ... fill rec.xy, rec.direction, ..., rec.electrodes ...
-    return rec
+def load_neuropixels(sorting, positions, pos_sample_rate, pixels_per_metre, ...):
+    # 1. Spikes: `sorting` is a Kilosort/phy output folder (read via
+    #    SpikeInterface's read_phy/read_kilosort, the [neuropixels] extra), a
+    #    SpikeInterface Sorting object, or any object exposing get_unit_ids() /
+    #    get_unit_spike_train(unit_id) / sampling_frequency.
+    # 2. Position: a Neuropixels probe records neural data only, so `positions`
+    #    (n_pos, 2) comes from your behavioural source (VR / camera / DLC) on
+    #    its own clock, which the caller must already have aligned to the
+    #    neural clock's t=0. direction/speed are derived from it if not given.
+    # 3. All units become one Electrode (the probe): clusters = sorted unit ids,
+    #    pos_index = floor(spike_time * pos_sample_rate). rate_map(rec,
+    #    electrode=probe_id, cluster=unit_id) then works exactly as for DACQ.
 ```
 
-SpikeInterface and probeinterface arrive with the `[neuropixels]` extra and are
-never a runtime dependency of the core. The position/sync step is lab-specific
-and does not exist yet.
+Contrast with `load_dacq`, which reads raw Axona binary files directly: same
+`Recording` contract, completely different plumbing. SpikeInterface arrives
+only with the `[neuropixels]` extra and is never a runtime dependency of the
+core — if you already hold a `Sorting` object, no extra install is needed.
+`load_neuropixels` is experimental and, unlike the bit-exact DACQ loader, has
+no golden-master validation (see the README) — a good target to harden.
 
 ## Checklist for a new loader
 

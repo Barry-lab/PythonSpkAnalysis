@@ -50,7 +50,7 @@ from .analysis.pxd import place_by_direction, pxd
 from .analysis.spatial import adaptive_binning, spatial_information, true_ppm_bounding_box
 from .analysis.spatial_fft import FFTParams, grid_fft_components, power_spectrum_2d, to_polar_fft
 from .core.recording import Electrode, Recording
-from .io.axona import load_dacq, read_inp, read_stm, write_cut
+from .io.axona import eeg_convert_to_volts, load_dacq, read_inp, read_stm, write_cut
 
 __version__ = "0.1.0"
 
@@ -62,6 +62,7 @@ __all__ = [
     "read_inp",
     "read_stm",
     "write_cut",
+    "eeg_convert_to_volts",
     "rate_map",
     "occupancy_map",
     "spike_map",
