@@ -192,23 +192,63 @@ print(result["is_grid"])   # (4, 2) bool: 4 gridness variants x [temporal, field
 ## The `Recording` object
 
 ```
-RAW FILES            FRONT-END LOADERS          COMMON OBJECT        ANALYSIS
-------------------   ------------------------   ------------------   ------------------
-DACQ / Axona     ->  load_dacq()            \
-Neuropixels/SpikeGLX  (SpikeInterface, WIP)  >  Recording        ->  everything above
-Neuropixels/OpenEphys (SpikeInterface, WIP) /   (spikes, xy,
-                                                 speed, dir, lfp)
+RAW FILES              FRONT-END LOADERS          COMMON OBJECT        ANALYSIS
+--------------------   ------------------------   ------------------   ------------------
+DACQ / Axona       ->  load_dacq()            \
+Neuropixels (sorted +  load_neuropixels()      >  Recording        ->  everything above
+  a position track)    [experimental]         /   (spikes, xy,
+                                                   speed, dir, lfp)
 ```
 
 A loader's only job is to fill a
 [`Recording`](src/barrylab/core/recording.py) — a plain container you can
 poke at directly (`rec.xy`, `rec.speed`, `rec.direction`, `rec.pos_times`,
 `rec.electrode(n).spike_pos_index(cluster)`, ...). Every analysis function
-consumes that object (or arrays derived from it) and nothing else, so none of
-the code above will need to change when the Neuropixels front end lands. See
+consumes that object (or arrays derived from it) and nothing else, so the same
+analysis code runs on DACQ and Neuropixels data alike. See
 [`docs/architecture.md`](docs/architecture.md) for the full design, and
 [`docs/adding_a_loader.md`](docs/adding_a_loader.md) if you're writing a new
 front end.
+
+### Neuropixels (experimental)
+
+> ⚠️ **The Neuropixels front end is experimental and far less tested than the
+> DACQ loader.** It has no golden-master validation and is exercised only
+> against synthetic/mock data (open Neuropixels spatial datasets are huge and
+> need GPU spike-sorting this package doesn't do). Treat results with care,
+> cross-check against a method you trust, and **please improve/fix it** — it's
+> a starting point, not a finished pipeline. Bug reports and PRs welcome.
+
+`barrylab` doesn't spike-sort or read raw Neuropixels files — that's what
+Kilosort + [SpikeInterface](https://spikeinterface.readthedocs.io) are for.
+`load_neuropixels` takes the **already-sorted** output plus a **separate
+position track** (a Neuropixels probe records neural data only — position
+comes from your VR rig / camera / DeepLabCut, on its own clock, which you must
+have already aligned to the neural clock's `t=0`):
+
+```python
+import barrylab as bl
+
+# `sorting` = a Kilosort/phy output folder (read via SpikeInterface), or any
+# SpikeInterface Sorting object. `positions` = your (n_pos, 2) behavioural
+# track, sampled at `pos_sample_rate`.
+rec = bl.load_neuropixels(
+    sorting="/data/mouse42/kilosort_output",
+    positions=xy,                 # (n_pos, 2) x, y from your tracker
+    pos_sample_rate=50.0,         # Hz of the position track
+    pixels_per_metre=100.0,       # spatial scale (use 100 if xy is already in cm)
+)
+
+# from here it's identical to DACQ: every analysis just takes the Recording
+rmap = bl.rate_map(rec, electrode=1, cluster=7)   # cluster = a sorted unit id
+gridness, _ = bl.gridness(bl.spatial_autocorrelogram(rmap))
+```
+
+Needs the `[neuropixels]` extra for the SpikeInterface reader
+(`pip install "barrylab[neuropixels]"`); if you already have a `Sorting`
+object in hand, no extra install is needed. Good public datasets to try it on
+include the [One-shot entorhinal maps](https://data.mendeley.com/datasets/rgtk6jygjc/1)
+Neuropixels VR + open-field recordings.
 
 ## Documentation
 

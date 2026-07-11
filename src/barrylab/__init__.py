@@ -11,6 +11,7 @@ consume. Typical use::
     bits_per_spike, _ = bl.spatial_information(rmap, bl.occupancy_map(rec))
 """
 
+from .io.neuropixels import load_neuropixels
 from .analysis._stats import nan_corr
 from .analysis.decoding import (
     decode_calc_post,
@@ -57,6 +58,7 @@ __all__ = [
     "Recording",
     "Electrode",
     "load_dacq",
+    "load_neuropixels",
     "read_inp",
     "read_stm",
     "write_cut",
