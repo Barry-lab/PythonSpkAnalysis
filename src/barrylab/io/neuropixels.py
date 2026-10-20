@@ -119,8 +119,11 @@ def load_neuropixels(
     pixels_per_metre : float
         Spatial scale, for converting position units to cm.
     window : (float, float, float, float), optional
-        ``(min_x, max_x, min_y, max_y)`` tracked window. Defaults to the
-        bounding box of ``positions`` (ignoring NaNs).
+        ``(min_x, max_x, min_y, max_y)`` tracked window, in the same frame
+        as ``positions``. Defaults to the bounding box of ``positions``
+        (ignoring NaNs). ``Recording.xy`` is stored relative to the window's
+        ``(min_x, min_y)`` corner, as for DACQ data, so rate maps span exactly
+        the window.
     direction : ndarray (n_pos,), optional
         Head direction in degrees. If ``None``, it is derived from the
         frame-to-frame displacement of ``positions`` (the 1-LED / movement
@@ -166,6 +169,9 @@ def load_neuropixels(
             float(np.nanmin(positions[:, 1])),
             float(np.nanmax(positions[:, 1])),
         )
+
+    # Recording.xy is in the window frame (as DACQ), so binning spans [0, window_extent].
+    positions = positions - np.array([window[0], window[2]])
 
     if direction is None:
         direction = _position._heading_from_displacement(positions, pos_sample_rate)

@@ -134,3 +134,30 @@ def test_load_neuropixels_path_without_spikeinterface_raises_clear_error(tmp_pat
     with pytest.raises(ImportError, match="barrylab\\[neuropixels\\]"):
         load_neuropixels(str(tmp_path), positions=np.zeros((5, 2)), pos_sample_rate=50.0,
                          pixels_per_metre=100.0)
+
+
+def test_load_neuropixels_puts_positions_in_window_frame():
+    """Positions away from the camera origin must not pile into the edge bins.
+
+    Before the fix the default window was the positions' bounding box but xy
+    was not shifted by its minimum, so every sample above (max - min) was
+    clamped into the last row/column of the occupancy map.
+    """
+    sorting, xy, pos_rate = _synthetic_place_cell_sorting()
+    offset = np.array([150.0, 80.0])
+    rec_origin = load_neuropixels(
+        sorting, positions=xy, pos_sample_rate=pos_rate, pixels_per_metre=100.0
+    )
+    rec_offset = load_neuropixels(
+        sorting, positions=xy + offset, pos_sample_rate=pos_rate, pixels_per_metre=100.0
+    )
+    np.testing.assert_allclose(rec_offset.xy, rec_origin.xy)
+    np.testing.assert_allclose(
+        bl.analysis.maps.occupancy_map(rec_offset), bl.analysis.maps.occupancy_map(rec_origin)
+    )
+    np.testing.assert_allclose(
+        bl.rate_map(rec_offset, electrode=1, cluster=7),
+        bl.rate_map(rec_origin, electrode=1, cluster=7),
+        equal_nan=True,
+    )
+    assert rec_offset.window[0] == xy[:, 0].min() + offset[0]
